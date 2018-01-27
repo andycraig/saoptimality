@@ -85,7 +85,7 @@ void row_col_update_of_inverse(const arma::mat& A, arma::mat& A_inv, arma::vec w
 //' A^-1 -> (A with row/col j replaced)^-1
 //' @param want The desired vector to be put in row/col \code{j}.
 //' @param j Row/col of A to update, zero-indexed.
-//' [[Rcpp::export]]
+// [[Rcpp::export]]
 void row_col_update_of_matrix_and_inverse(arma::mat& A, arma::mat& A_inv, arma::vec want, int j) {
   row_col_update_of_inverse(A, A_inv, want, j);
   row_col_update_of_matrix(A, want, j);

@@ -6,6 +6,16 @@
 
 using namespace Rcpp;
 
+// rcpparma_hello_world2
+arma::mat rcpparma_hello_world2();
+RcppExport SEXP _saoptimality_rcpparma_hello_world2() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(rcpparma_hello_world2());
+    return rcpp_result_gen;
+END_RCPP
+}
 // rcpparma_hello_world
 arma::mat rcpparma_hello_world();
 RcppExport SEXP _saoptimality_rcpparma_hello_world() {
@@ -49,12 +59,131 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// euclidean_distance
+double euclidean_distance(arma::rowvec a, arma::rowvec b);
+RcppExport SEXP _saoptimality_euclidean_distance(SEXP aSEXP, SEXP bSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::rowvec >::type a(aSEXP);
+    Rcpp::traits::input_parameter< arma::rowvec >::type b(bSEXP);
+    rcpp_result_gen = Rcpp::wrap(euclidean_distance(a, b));
+    return rcpp_result_gen;
+END_RCPP
+}
+// matern_cov
+double matern_cov(double nu, double kappa, double x);
+RcppExport SEXP _saoptimality_matern_cov(SEXP nuSEXP, SEXP kappaSEXP, SEXP xSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< double >::type nu(nuSEXP);
+    Rcpp::traits::input_parameter< double >::type kappa(kappaSEXP);
+    Rcpp::traits::input_parameter< double >::type x(xSEXP);
+    rcpp_result_gen = Rcpp::wrap(matern_cov(nu, kappa, x));
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_dist_matrix
+arma::mat get_dist_matrix(const arma::mat& D);
+RcppExport SEXP _saoptimality_get_dist_matrix(SEXP DSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::mat& >::type D(DSEXP);
+    rcpp_result_gen = Rcpp::wrap(get_dist_matrix(D));
+    return rcpp_result_gen;
+END_RCPP
+}
+// rank_one_update
+void rank_one_update(arma::mat& A_inv, arma::vec& u, arma::vec& v);
+RcppExport SEXP _saoptimality_rank_one_update(SEXP A_invSEXP, SEXP uSEXP, SEXP vSEXP) {
+BEGIN_RCPP
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::mat& >::type A_inv(A_invSEXP);
+    Rcpp::traits::input_parameter< arma::vec& >::type u(uSEXP);
+    Rcpp::traits::input_parameter< arma::vec& >::type v(vSEXP);
+    rank_one_update(A_inv, u, v);
+    return R_NilValue;
+END_RCPP
+}
+// row_col_update_of_matrix
+void row_col_update_of_matrix(arma::mat& A, arma::vec want, int j);
+RcppExport SEXP _saoptimality_row_col_update_of_matrix(SEXP ASEXP, SEXP wantSEXP, SEXP jSEXP) {
+BEGIN_RCPP
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::mat& >::type A(ASEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type want(wantSEXP);
+    Rcpp::traits::input_parameter< int >::type j(jSEXP);
+    row_col_update_of_matrix(A, want, j);
+    return R_NilValue;
+END_RCPP
+}
+// row_col_update_of_inverse
+void row_col_update_of_inverse(const arma::mat& A, arma::mat& A_inv, arma::vec want, int j);
+RcppExport SEXP _saoptimality_row_col_update_of_inverse(SEXP ASEXP, SEXP A_invSEXP, SEXP wantSEXP, SEXP jSEXP) {
+BEGIN_RCPP
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::mat& >::type A(ASEXP);
+    Rcpp::traits::input_parameter< arma::mat& >::type A_inv(A_invSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type want(wantSEXP);
+    Rcpp::traits::input_parameter< int >::type j(jSEXP);
+    row_col_update_of_inverse(A, A_inv, want, j);
+    return R_NilValue;
+END_RCPP
+}
+// row_col_update_of_matrix_and_inverse
+void row_col_update_of_matrix_and_inverse(arma::mat& A, arma::mat& A_inv, arma::vec want, int j);
+RcppExport SEXP _saoptimality_row_col_update_of_matrix_and_inverse(SEXP ASEXP, SEXP A_invSEXP, SEXP wantSEXP, SEXP jSEXP) {
+BEGIN_RCPP
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::mat& >::type A(ASEXP);
+    Rcpp::traits::input_parameter< arma::mat& >::type A_inv(A_invSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type want(wantSEXP);
+    Rcpp::traits::input_parameter< int >::type j(jSEXP);
+    row_col_update_of_matrix_and_inverse(A, A_inv, want, j);
+    return R_NilValue;
+END_RCPP
+}
+// choose_cells_cpp
+List choose_cells_cpp(arma::mat X, arma::mat D, bool exclusive, arma::uvec grps, arma::uvec s, double nu, double kappa, double resolution, arma::vec betas, int n_steps, int family, arma::uvec Ds_parameters, double ar1_rho, uint t);
+RcppExport SEXP _saoptimality_choose_cells_cpp(SEXP XSEXP, SEXP DSEXP, SEXP exclusiveSEXP, SEXP grpsSEXP, SEXP sSEXP, SEXP nuSEXP, SEXP kappaSEXP, SEXP resolutionSEXP, SEXP betasSEXP, SEXP n_stepsSEXP, SEXP familySEXP, SEXP Ds_parametersSEXP, SEXP ar1_rhoSEXP, SEXP tSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::mat >::type X(XSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type D(DSEXP);
+    Rcpp::traits::input_parameter< bool >::type exclusive(exclusiveSEXP);
+    Rcpp::traits::input_parameter< arma::uvec >::type grps(grpsSEXP);
+    Rcpp::traits::input_parameter< arma::uvec >::type s(sSEXP);
+    Rcpp::traits::input_parameter< double >::type nu(nuSEXP);
+    Rcpp::traits::input_parameter< double >::type kappa(kappaSEXP);
+    Rcpp::traits::input_parameter< double >::type resolution(resolutionSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type betas(betasSEXP);
+    Rcpp::traits::input_parameter< int >::type n_steps(n_stepsSEXP);
+    Rcpp::traits::input_parameter< int >::type family(familySEXP);
+    Rcpp::traits::input_parameter< arma::uvec >::type Ds_parameters(Ds_parametersSEXP);
+    Rcpp::traits::input_parameter< double >::type ar1_rho(ar1_rhoSEXP);
+    Rcpp::traits::input_parameter< uint >::type t(tSEXP);
+    rcpp_result_gen = Rcpp::wrap(choose_cells_cpp(X, D, exclusive, grps, s, nu, kappa, resolution, betas, n_steps, family, Ds_parameters, ar1_rho, t));
+    return rcpp_result_gen;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
+    {"_saoptimality_rcpparma_hello_world2", (DL_FUNC) &_saoptimality_rcpparma_hello_world2, 0},
     {"_saoptimality_rcpparma_hello_world", (DL_FUNC) &_saoptimality_rcpparma_hello_world, 0},
     {"_saoptimality_rcpparma_outerproduct", (DL_FUNC) &_saoptimality_rcpparma_outerproduct, 1},
     {"_saoptimality_rcpparma_innerproduct", (DL_FUNC) &_saoptimality_rcpparma_innerproduct, 1},
     {"_saoptimality_rcpparma_bothproducts", (DL_FUNC) &_saoptimality_rcpparma_bothproducts, 1},
+    {"_saoptimality_euclidean_distance", (DL_FUNC) &_saoptimality_euclidean_distance, 2},
+    {"_saoptimality_matern_cov", (DL_FUNC) &_saoptimality_matern_cov, 3},
+    {"_saoptimality_get_dist_matrix", (DL_FUNC) &_saoptimality_get_dist_matrix, 1},
+    {"_saoptimality_rank_one_update", (DL_FUNC) &_saoptimality_rank_one_update, 3},
+    {"_saoptimality_row_col_update_of_matrix", (DL_FUNC) &_saoptimality_row_col_update_of_matrix, 3},
+    {"_saoptimality_row_col_update_of_inverse", (DL_FUNC) &_saoptimality_row_col_update_of_inverse, 4},
+    {"_saoptimality_row_col_update_of_matrix_and_inverse", (DL_FUNC) &_saoptimality_row_col_update_of_matrix_and_inverse, 4},
+    {"_saoptimality_choose_cells_cpp", (DL_FUNC) &_saoptimality_choose_cells_cpp, 14},
     {NULL, NULL, 0}
 };
 
