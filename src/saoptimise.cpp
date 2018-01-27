@@ -27,8 +27,8 @@ double matern_cov(double nu, double kappa, double x) {
 // [[Rcpp::export]]
 arma::mat get_dist_matrix(const arma::mat& D) {
   arma::mat X = arma::mat(D.n_rows, D.n_rows, arma::fill::zeros);
-  for (int i_elem = 0; i_elem < D.n_rows - 1; ++i_elem) {
-    for (int j_elem = i_elem + 1; j_elem < D.n_rows; ++j_elem) {
+  for (unsigned int i_elem = 0; i_elem < D.n_rows - 1; ++i_elem) {
+    for (unsigned int j_elem = i_elem + 1; j_elem < D.n_rows; ++j_elem) {
       X(j_elem, i_elem) = sqrt(sum(pow((D.row(i_elem) - D.row(j_elem)),2)));
       X(i_elem, j_elem) = X(j_elem, i_elem);
     }
@@ -143,7 +143,7 @@ private:
   const arma::uvec indices_within_weights; // For finding correct values in weights.
   const bool exclusive;
   const double ar1_rho;
-  const uint t; // Number of time points.
+  const int t; // Number of time points.
   arma::uvec Ds_non_parameters; // Mask for betas not of interest, for D_s optimality.
   bool is_Ds; // true to calculate Ds optimality, false for D optimality.
   arma::mat C_temporal, C_temporal_inv, C_spatial, C_spatial_inv, W; // For caching parts of optimality calculation.
@@ -152,19 +152,19 @@ private:
   IntegerVector indexes_in_s;
   arma::mat s_X; // The subset of rows of X corresponding to just those elements in s.
   arma::mat s_D; // The subset of rows of D corresponding to just those elements in s.
-  int index_in_s_to_switch; // Tracks the index of the element in s for which changes are currently being proposed/rejected.
-  int old_element; // The old value of the element of s.
+  unsigned int index_in_s_to_switch; // Tracks the index of the element in s for which changes are currently being proposed/rejected.
+  unsigned int old_element; // The old value of the element of s.
   double e, e_old, e_old_old;
   // When s_X (design matrix of current state) is updated, multiple rows need to change.
   // This is a utility function to do this.
-  void update_s_X(uint index_in_s, uint element) {
+  void update_s_X(int index_in_s, int element) {
     // Change rows in s_X corresponding to index_in_s_to_switch 
     // to rows in X corresponding to element.
     // Need to update t rows of s_X.
-    uint s_X_start = index_in_s * t;
-    uint s_X_end = (index_in_s + 1) * t - 1;
-    uint X_start = element * t;
-    uint X_end = (element + 1) * t - 1;
+    int s_X_start = index_in_s * t;
+    int s_X_end = (index_in_s + 1) * t - 1;
+    int X_start = element * t;
+    int X_end = (element + 1) * t - 1;
     if (s_X_start == s_X_end) {
       // Only one row - can't use .rows().
       s_X.row(s_X_start) = X.row(X_start);
@@ -176,7 +176,7 @@ private:
   // - Covariance betwen locations.
   // - Design matrix.
   // - Optimality score.
-  void update_d_optimality(uint element) {
+  void update_d_optimality(int element) {
     s[index_in_s_to_switch] = element;
     // Update s_D (locations).
     s_D.row(index_in_s_to_switch) = D.row(s[index_in_s_to_switch]);
@@ -193,8 +193,8 @@ private:
     if (family == 1) { // Logistic/binomial
       // Need to update t elements.
       //TODO Update t rows of W.
-      uint s_X_start = index_in_s_to_switch * t;
-      uint s_X_end = (index_in_s_to_switch + 1) * t - 1;
+      int s_X_start = index_in_s_to_switch * t;
+      int s_X_end = (index_in_s_to_switch + 1) * t - 1;
       arma::vec p_y_j = 1 / (1 + exp(-1 * s_X.rows(s_X_start, s_X_end) * betas));
       W(arma::span(s_X_start, s_X_end), arma::span(s_X_start, s_X_end)) = arma::diagmat(p_y_j % (1 - p_y_j));
     }
@@ -228,7 +228,7 @@ private:
     // and calculate the covariance between this and all other locations in s.
     arma::rowvec loc_of_index_in_s_to_switch = D.row(s[index_in_s_to_switch]);
     arma::vec covs(s_D.n_rows);
-    for (int i_loc = 0; i_loc < covs.size(); ++i_loc) {
+    for (unsigned int i_loc = 0; i_loc < covs.size(); ++i_loc) {
       if (i_loc == index_in_s_to_switch) {
         covs[i_loc] = 1; // Never actually used.
       } else {
@@ -248,7 +248,7 @@ public:
   State(arma::mat X_, arma::mat D_, bool exclusive_, arma::uvec grps_, arma::uvec s_,
         std::vector<arma::mat> weights_, arma::uvec indices_within_weights_, 
         double nu_, double kappa_, double resolution_, arma::vec betas_, int family_, 
-        arma::uvec Ds_parameters, double ar1_rho_, uint t_) : 
+        arma::uvec Ds_parameters, double ar1_rho_, int t_) : 
   grps(grps_), weights(weights_), indices_within_weights(indices_within_weights_),
   exclusive(exclusive_), nu(nu_), kappa(kappa_), resolution(resolution_), 
   betas(betas_), family(family_), ar1_rho(ar1_rho_), t(t_) {
@@ -266,16 +266,16 @@ public:
     indexes_in_s = arma::linspace<arma::vec>(0, s.size() - 1, s.size());
     // Initialise subsets of X, D for the initial s.
     s_X = arma::mat(s.size() * t, betas.size());
-    for (int i_s = 0; i_s < s.size(); ++i_s) {
+    for (unsigned int i_s = 0; i_s < s.size(); ++i_s) {
       update_s_X(i_s, s(i_s));
     }
     s_D = D.rows(s);
     // Calculate covariance matrix for initial s.
     // Calculate spatial component.
     C_spatial = arma::mat(s.size(), s.size()); // Need to retain, for updating when units change.
-    for (int i_row = 0; i_row < s.size(); ++i_row) {
+    for (unsigned int i_row = 0; i_row < s.size(); ++i_row) {
       C_spatial(i_row, i_row) = 1; // The diagonal.
-      for (int i_col = 0; i_col < i_row; ++i_col) { // Symmetric matrix, so just calculate lower triangle.
+      for (unsigned int i_col = 0; i_col < i_row; ++i_col) { // Symmetric matrix, so just calculate lower triangle.
         C_spatial(i_row, i_col) = matern_cov(nu, kappa, std::max(resolution, euclidean_distance(s_D.row(i_row), s_D.row(i_col))));
         C_spatial(i_col, i_row) = C_spatial(i_row, i_col); // Symmetric matrix, so update the upper triangle.
       }
@@ -288,9 +288,9 @@ public:
       C_temporal = arma::mat(1, 1, arma::fill::ones); 
     } else {
       C_temporal = arma::mat(t, t);
-      for (int i_row = 0; i_row < C_temporal.size(); ++i_row) {
+      for (unsigned int i_row = 0; i_row < C_temporal.size(); ++i_row) {
         C_temporal(i_row, i_row) = 1; // Diagonal.
-        for (int i_col = 0; i_col < i_row; ++i_col) {
+        for (unsigned int i_col = 0; i_col < i_row; ++i_col) {
           C_temporal(i_row, i_col) = pow(ar1_rho, abs(i_row - i_col));
           C_temporal(i_col, i_row) = C_temporal(i_row, i_col);
         }
@@ -326,11 +326,11 @@ public:
     old_element = s[index_in_s_to_switch]; // The value of the item in s to switch.
     // Want to replace with an element from the same group, so check that. 
     // Weight probabilities of indexes to select by 'distance' from s_to_switch.
-    int grp_of_old_element = grps[old_element];
+    unsigned int grp_of_old_element = grps[old_element];
     arma::rowvec weights_available = weights[grp_of_old_element].row(indices_within_weights[old_element]);
     if (exclusive) {
       // Zero probability of all candidates in current state.
-      for (int i_s = 0; i_s < s.size(); ++i_s) {
+      for (unsigned int i_s = 0; i_s < s.size(); ++i_s) {
         if (grps[s[i_s]] == grp_of_old_element) {
           weights_available[indices_within_weights[s[i_s]]] = 0; 
         }
@@ -342,7 +342,7 @@ public:
     // Update s.
     //TODO Avoid cast to NumericVector.
     arma::uvec indices_of_old_grp = find(grps == grp_of_old_element);
-    uint new_candidate = sample(IntegerVector(indices_of_old_grp.begin(), indices_of_old_grp.end()), 
+    int new_candidate = sample(IntegerVector(indices_of_old_grp.begin(), indices_of_old_grp.end()), 
                                 1, 
                                 get_annealed_prob(NumericVector(weights_available.begin(), 
                                                                        weights_available.end()),
@@ -442,7 +442,7 @@ double get_next_state(State& s, double temperature) {
 List choose_cells_cpp(arma::mat X, arma::mat D, bool exclusive, arma::uvec grps,
                       arma::uvec s, double nu, double kappa, double resolution, 
                       arma::vec betas, int n_steps, int family, arma::uvec Ds_parameters,
-                      double ar1_rho, uint t) {
+                      double ar1_rho, int t) {
   if (exclusive) {
     arma::uvec s_unique = unique(s);
     if (s.size() != s_unique.size()) {
@@ -450,7 +450,7 @@ List choose_cells_cpp(arma::mat X, arma::mat D, bool exclusive, arma::uvec grps,
     }
   }
   arma::uvec grp_names = unique(grps);
-  uint n_grps = grp_names.size();
+  int n_grps = grp_names.size();
   
   // Create weights vector, each element of which is the distance matrix for a group.
   std::vector<arma::mat> weights(n_grps);
