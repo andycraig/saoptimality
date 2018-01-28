@@ -5,9 +5,6 @@
 #' 
 #' Uses simulated annealing, and does the computationally heavy evaluation
 #' of the energy function in an efficient manner.
-#'
-#' @param groups Integer vector. Either length N, with the ith element being the group of the ith unit, 
-#' or \code{NULL}, which is equivalent to all elements belonging to the same group.
 #' @param D N x 2 matrix with first column being x coordinates and second column y coordinates.
 #' @param X (N x \code{t}) x p matrix of the covariates of ALL the available candidates. Rows must be 
 #' organised by unit first then by time, e.g., 
@@ -16,10 +13,20 @@
 #' @param numbers List with names being the values of \code{df}'s column \code{g}, and 
 #' values being the number of items from that group to select from \code{df}.
 #' @param n_steps Integer. The number of simulated annealing steps to take.
-#' @param s_initial Integer vector or \code{NULL}. If an integer vector, the (1-indexed) indexes of 
-#' \code{X}, \code{D} and \code{groups}. If \code{NULL}, initial state is chosen randomly. 
 #' @param nu Numeric. The Matern smoothness parameter.
 #' @param kappa Numeric. sqrt(8 * nu) / range, where range is usually the distance where the covariance is about 0.1.
+#' @param resolution Numeric. The assumed resolution of \code{D}. In the case where
+#' the state contains two units at the same location (e.g., if `\code{exclusive} is \code{FALSE})
+#' a fraction of this will be added to one of them so that they aren't at exactly the same place.
+#' @param betas Numeric vector of length p. Estimates of the regression coefficients. Used
+#' to computer the weight matrix if \code{family} is not "gaussian".
+#' @param s2rf The variance of the random field (which, when multiplied by the correlation of the 
+#' random field, produces the covariance of the random field).
+#' @param groups Integer vector. Either length N, with the ith element being the group of the ith unit, 
+#' or \code{NULL}, which is equivalent to all elements belonging to the same group.
+#' @param exclusive If \code{FALSE}, the same candidate can be in the state multiple times.
+#' @param s_initial Integer vector or \code{NULL}. If an integer vector, the (1-indexed) indexes of 
+#' \code{X}, \code{D} and \code{groups}. If \code{NULL}, initial state is chosen randomly. 
 #' @param Ds_parameters Numeric vector. If this contains any elements, the optimality criterion becomes  
 #' D_s. For example: If Ds_parameters is c(1, 3), then the 1st and 3rd (note the indexing) elements of 
 #' beta are of interest. If Ds_parameters is empty or \code{NULL}, the optimality criterion is D.
@@ -98,7 +105,7 @@
 #' groups = rep("a", nrow(D))
 #' ar1_rho = 0
 #' @export
-choose_cells = function(D, X, numbers, n_steps, nu, kappa, resolution, betas,
+choose_cells = function(D, X, numbers, n_steps, nu, kappa, resolution, betas, s2rf,
                         groups = NULL, exclusive = FALSE, s_initial = NULL, 
                         family = c("gaussian", "binomial"), Ds_parameters = NULL,
                         ar1_rho = NULL, t = NULL) {
@@ -155,8 +162,7 @@ choose_cells = function(D, X, numbers, n_steps, nu, kappa, resolution, betas,
                             s_initial - 1, # To 0-indexed. 
                             nu, kappa, resolution, betas, n_steps, family_int, 
                             Ds_parameters - 1, # To 0-indexed.
-                            ar1_rho,
-                            t
+                            ar1_rho, t, s2rf
   )
   # Values of s from choose_cells_cpp are 0-indexed. Change them to be 1-indexed.
   result$s = result$s + 1

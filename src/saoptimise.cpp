@@ -13,13 +13,12 @@ double euclidean_distance(arma::rowvec a, arma::rowvec b) {
 //' Wrap INLA::inla.matern.cov(). Only accepts a single distance (not vectorised at all).
 //' @param x The distance between the two points.
 // [[Rcpp::export]]
-double matern_cov(double nu, double kappa, double x) {
+double matern_corr(double nu, double kappa, double x) {
   Rcpp::Environment package_env("package:INLA");
   Rcpp::Function rfunction = package_env["inla.matern.cov"];
-  //TODO Check that corr FALSE is correct.
   // R signature:
   // inla.matern.cov(nu, kappa, x, d = 1, corr = FALSE, norm.corr = FALSE, theta, epsilon = 1e-08)
-  return(as<double>(rfunction(nu, kappa, x, 2, false)));
+  return(as<double>(rfunction(nu, kappa, x, 2, true)));
 }
 
 //' @param D N x 2 matrix, with each row being a location.
@@ -144,6 +143,7 @@ private:
   const bool exclusive;
   const double ar1_rho;
   const int t; // Number of time points.
+  double s2rf; // Variance of random field.
   arma::uvec Ds_non_parameters; // Mask for betas not of interest, for D_s optimality.
   bool is_Ds; // true to calculate Ds optimality, false for D optimality.
   arma::mat C_temporal, C_temporal_inv, C_spatial, C_spatial_inv, W; // For caching parts of optimality calculation.
@@ -180,7 +180,7 @@ private:
     s[index_in_s_to_switch] = element;
     // Update s_D (locations).
     s_D.row(index_in_s_to_switch) = D.row(s[index_in_s_to_switch]);
-    arma::vec new_C_row = locations2covs();
+    arma::vec new_C_row = locations2corrs();
     // Since only one element is updated at a time, we need only update one 
     // row and column of each of X and C (and hence C_inv). 
     // Update X.
@@ -212,18 +212,17 @@ private:
     // Rcout << "C" << std::endl<< kron(C_temporal_inv, C_spatial_inv) << std::endl;
     // Rcout << "W " << std::endl << W << std::endl;
     //Rcout << "Information matrix before taking det " << std::endl << s_X.t() * C_inv * W * s_X << std::endl;
-    // Using identity that inv(kron(A, B)) = kron(inv(a), inv(B)).
+    // Using identity that inv(s2rf * kron(A, B)) = 1 / s2rf * kron(inv(a), inv(B)).
+    arma::mat numerator_matrix = 1 / s2rf * s_X.t() * kron(C_temporal_inv, C_spatial_inv) * W * s_X;
     if (is_Ds) {
       // D_s optimality.
-      arma::mat numerator_matrix = s_X.t() * kron(C_temporal_inv, C_spatial_inv) * W * s_X;
       e = -1 * log(det(numerator_matrix) / det(numerator_matrix(Ds_non_parameters, Ds_non_parameters)));
     } else {
       // D optimality.
-      e = -1 * log(det(s_X.t() * kron(C_temporal_inv, C_spatial_inv) * W * s_X));
+      e = -1 * log(det(numerator_matrix));
     }
   }
-  //TODO Check that it's covariance and not correlation.
-  arma::vec locations2covs() {
+  arma::vec locations2corrs() {
     // Use index_in_s_to_switch to look up the element of s that has changed, 
     // and calculate the covariance between this and all other locations in s.
     arma::rowvec loc_of_index_in_s_to_switch = D.row(s[index_in_s_to_switch]);
@@ -235,7 +234,7 @@ private:
         // If dist i/s 0, which can happen if exclusive is false, set it to a small number because the locations wouldn't be the same in practice.
         double eucl_dist = euclidean_distance(loc_of_index_in_s_to_switch, s_D.row(i_loc));
         double dist = std::max(resolution, eucl_dist);
-        covs[i_loc] = matern_cov(nu, kappa, dist); 
+        covs[i_loc] = matern_corr(nu, kappa, dist); 
       }
     }
     return (covs);
@@ -248,10 +247,10 @@ public:
   State(arma::mat X_, arma::mat D_, bool exclusive_, arma::uvec grps_, arma::uvec s_,
         std::vector<arma::mat> weights_, arma::uvec indices_within_weights_, 
         double nu_, double kappa_, double resolution_, arma::vec betas_, int family_, 
-        arma::uvec Ds_parameters, double ar1_rho_, int t_) : 
+        arma::uvec Ds_parameters, double ar1_rho_, int t_, double s2rf_) : 
   grps(grps_), weights(weights_), indices_within_weights(indices_within_weights_),
   exclusive(exclusive_), nu(nu_), kappa(kappa_), resolution(resolution_), 
-  betas(betas_), family(family_), ar1_rho(ar1_rho_), t(t_) {
+  betas(betas_), family(family_), ar1_rho(ar1_rho_), t(t_), s2rf(s2rf_) {
 
     X = X_;
     D = D_;
@@ -270,13 +269,13 @@ public:
       update_s_X(i_s, s(i_s));
     }
     s_D = D.rows(s);
-    // Calculate covariance matrix for initial s.
+    // Calculate correlation matrix for initial s.
     // Calculate spatial component.
     C_spatial = arma::mat(s.size(), s.size()); // Need to retain, for updating when units change.
     for (unsigned int i_row = 0; i_row < s.size(); ++i_row) {
       C_spatial(i_row, i_row) = 1; // The diagonal.
       for (unsigned int i_col = 0; i_col < i_row; ++i_col) { // Symmetric matrix, so just calculate lower triangle.
-        C_spatial(i_row, i_col) = matern_cov(nu, kappa, std::max(resolution, euclidean_distance(s_D.row(i_row), s_D.row(i_col))));
+        C_spatial(i_row, i_col) = matern_corr(nu, kappa, std::max(resolution, euclidean_distance(s_D.row(i_row), s_D.row(i_col))));
         C_spatial(i_col, i_row) = C_spatial(i_row, i_col); // Symmetric matrix, so update the upper triangle.
       }
     }
@@ -438,11 +437,13 @@ double get_next_state(State& s, double temperature) {
 //' beta are of interest. If Ds_parameters is empty, the optimality criterion is D.
 //' @param ar1_rho The temporal autocorrelation.
 //' @param t The number of time points.
+//' @param s2rf The variance of the random field (which, when multiplied by the correlation of the 
+//' random field, produces the covariance of the random field).
 // [[Rcpp::export]]
 List choose_cells_cpp(arma::mat X, arma::mat D, bool exclusive, arma::uvec grps,
                       arma::uvec s, double nu, double kappa, double resolution, 
                       arma::vec betas, int n_steps, int family, arma::uvec Ds_parameters,
-                      double ar1_rho, int t) {
+                      double ar1_rho, int t, double s2rf) {
   if (exclusive) {
     arma::uvec s_unique = unique(s);
     if (s.size() != s_unique.size()) {
@@ -462,7 +463,8 @@ List choose_cells_cpp(arma::mat X, arma::mat D, bool exclusive, arma::uvec grps,
     indices_within_weights.elem(indices_for_this_grp) = arma::linspace<arma::uvec>(0, indices_for_this_grp.size() - 1, indices_for_this_grp.size());
   }
   State state = State(X, D, exclusive, grps, s, weights, indices_within_weights, 
-                      nu, kappa, resolution, betas, family, Ds_parameters, ar1_rho, t);
+                      nu, kappa, resolution, betas, family, Ds_parameters, ar1_rho, 
+                      t, s2rf);
   // Initialise best to current.
   IntegerVector s_best = state.get_s_clone();
   double e_initial = state.evaluate();
@@ -486,6 +488,7 @@ List choose_cells_cpp(arma::mat X, arma::mat D, bool exclusive, arma::uvec grps,
                              Rcpp::Named("e") = e_best,
                              Rcpp::Named("C_temporal") = state.get_C_temporal(),
                              Rcpp::Named("C_spatial") = state.get_C_spatial(),
+                             Rcpp::Named("s2rf") = s2rf,
                              Rcpp::Named("X") = state.get_X(),
                              Rcpp::Named("W") = state.get_W()));
 }

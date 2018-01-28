@@ -57,8 +57,8 @@ euclidean_distance <- function(a, b) {
 
 #' Wrap INLA::inla.matern.cov(). Only accepts a single distance (not vectorised at all).
 #' @param x The distance between the two points.
-matern_cov <- function(nu, kappa, x) {
-    .Call(`_saoptimality_matern_cov`, nu, kappa, x)
+matern_corr <- function(nu, kappa, x) {
+    .Call(`_saoptimality_matern_corr`, nu, kappa, x)
 }
 
 #' @param D N x 2 matrix, with each row being a location.
@@ -130,7 +130,9 @@ row_col_update_of_matrix_and_inverse <- function(A, A_inv, want, j) {
 #' beta are of interest. If Ds_parameters is empty, the optimality criterion is D.
 #' @param ar1_rho The temporal autocorrelation.
 #' @param t The number of time points.
-choose_cells_cpp <- function(X, D, exclusive, grps, s, nu, kappa, resolution, betas, n_steps, family, Ds_parameters, ar1_rho, t) {
-    .Call(`_saoptimality_choose_cells_cpp`, X, D, exclusive, grps, s, nu, kappa, resolution, betas, n_steps, family, Ds_parameters, ar1_rho, t)
+#' @param s2rf The variance of the random field (which, when multiplied by the correlation of the 
+#' random field, produces the covariance of the random field).
+choose_cells_cpp <- function(X, D, exclusive, grps, s, nu, kappa, resolution, betas, n_steps, family, Ds_parameters, ar1_rho, t, s2rf) {
+    .Call(`_saoptimality_choose_cells_cpp`, X, D, exclusive, grps, s, nu, kappa, resolution, betas, n_steps, family, Ds_parameters, ar1_rho, t, s2rf)
 }
 
