@@ -54,7 +54,7 @@
 #' library(ggplot2)
 #' D %>% ggplot(aes(x = x , y = y, color = groups)) + geom_point()
 #' # Optimise.
-#' result = choose_cells(D, X, numbers, n_steps, nu, kappa, resolution, betas, groups, exclusive, family = family, t = t, ar1_rho = ar1_rho) 
+#' result = choose_cells(D, X, numbers, n_steps, nu, kappa, resolution, betas, s2rf, groups, exclusive, family = family, t = t, ar1_rho = ar1_rho) 
 #' # Display initial.
 #' D[result$s_initial,] %>% ggplot(aes(x = x, y = y, colour = groups[result$s_initial])) + geom_point(size = 10) + xlim(min(D$x), max(D$x)) + ylim(min(D$y), max(D$y))
 #' # Display results. 
@@ -69,6 +69,7 @@
 #' D = expand.grid(x = seq(-1, 1, by = 0.2), y = seq(-1, 1, by = 0.2))
 #' X = cbind(rep(1, nrow(D)), D$x) # Intercept and x coordinate as covariate.
 #' betas = c(1, 1)
+#' s2rf = 1
 #' resolution = 0.1
 #' exclusive = FALSE
 #' family = "gaussian"
