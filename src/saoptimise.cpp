@@ -148,6 +148,8 @@ private:
     arma::uvec Ds_non_parameters; // Mask for betas not of interest, for D_s optimality.
     bool is_Ds; // true to calculate Ds optimality, false for D optimality.
     arma::mat C_temporal, C_temporal_inv, C_spatial, C_spatial_inv, W; // For caching parts of optimality calculation.
+    arma::mat C_temporal_initial, C_temporal_inv_initial, C_spatial_initial, C_spatial_inv_initial;
+    arma::mat s_X_initial, s_D_initial, W_initial;
     bool can_reject; // Flag for whether proposal has been made.
     arma::uvec s; // The elements currently selected to be in the state. Unordered.
     IntegerVector indexes_in_s;
@@ -271,7 +273,9 @@ public:
         for (unsigned int i_s = 0; i_s < s.size(); ++i_s) {
             update_s_X(i_s, s(i_s));
         }
+        s_X_initial = s_X + 0; // Copy.
         s_D = D.rows(s);
+        s_D_initial = s_D + 0; // Copy.
         // Calculate correlation matrix for initial s.
         // Calculate spatial component.
         Rcout << "Calculating initial spatial correlation matrix..." << std::endl;
@@ -283,9 +287,11 @@ public:
                 C_spatial(i_col, i_row) = C_spatial(i_row, i_col); // Symmetric matrix, so update the upper triangle.
             }
         }
+        C_spatial_initial = C_spatial + 0; // Copy.
         //TODO Deal with case in which C is singular, which can probably happen if all candidates are in same place.
         Rcout << "Inverting spatial correlation matrix..." << std::endl;
         C_spatial_inv = inv(C_spatial);
+        C_spatial_inv_initial = C_spatial_inv + 0; // Copy.
         // Calculate temporal component.
         // Will never update as same for all units, but retain for output.
         Rcout << "Calculating initial temporal correlation matrix..." << std::endl;
@@ -302,8 +308,10 @@ public:
                 }
             }
         }
+        C_temporal_initial = C_temporal + 0; // Copy.
         Rcout << "Inverting temporal correlation matrix..." << std::endl;
         C_temporal_inv = inv(C_temporal);
+        C_temporal_inv_initial = C_temporal_inv + 0; // Copy.
         
         // Calculate weight matrix W. 
         Rcout << "Calculating initial weight matrix W..." << std::endl;
@@ -320,6 +328,7 @@ public:
                 W = arma::diagmat(w);
             }
         }
+        W_initial = W + 0;
         
         // Compute optimality criterion.
         calculate_d_optimality(); // 
@@ -403,8 +412,20 @@ public:
     // Get current D-optimality components.
     arma::mat get_C_spatial() {return C_spatial;}
     arma::mat get_C_temporal() {return C_temporal;}
+    arma::mat get_C_spatial_inv() {return C_spatial_inv;}
+    arma::mat get_C_temporal_inv() {return C_temporal_inv;}
     arma::mat get_X() {return s_X;}
+    arma::mat get_D() {return s_D;}
     arma::mat get_W() {return W;}
+    arma::mat get_C_spatial_initial() {return C_spatial_initial;}
+    arma::mat get_C_temporal_initial() {return C_temporal_initial;}
+    arma::mat get_C_spatial_inv_initial() {return C_spatial_inv_initial;}
+    arma::mat get_C_temporal_inv_initial() {return C_temporal_inv_initial;}
+    arma::mat get_X_initial() {return s_X_initial;}
+    arma::mat get_D_initial() {return s_D_initial;}
+    arma::mat get_W_initial() {return W_initial;}
+    arma::mat get_X_all() {return X;}
+    arma::mat get_D_all() {return D;}
     // Get energy of current s.
     double evaluate() {return(e);}
     // Get energy of old s.
@@ -556,7 +577,19 @@ List choose_cells_cpp(arma::mat X, arma::mat D, bool exclusive, arma::uvec grps,
                                Rcpp::Named("e") = e_best,
                                Rcpp::Named("C_temporal") = state.get_C_temporal(),
                                Rcpp::Named("C_spatial") = state.get_C_spatial(),
+                               Rcpp::Named("C_temporal_inv") = state.get_C_temporal_inv(),
+                               Rcpp::Named("C_spatial_inv") = state.get_C_spatial_inv(),
+                               Rcpp::Named("C_temporal_initial") = state.get_C_temporal_initial(),
+                               Rcpp::Named("C_spatial_initial") = state.get_C_spatial_initial(),
+                               Rcpp::Named("C_temporal_inv_initial") = state.get_C_temporal_inv_initial(),
+                               Rcpp::Named("C_spatial_inv_initial") = state.get_C_spatial_inv_initial(),
                                Rcpp::Named("s2rf") = s2rf,
+                               Rcpp::Named("D") = state.get_D(),
+                               Rcpp::Named("D_initial") = state.get_D_initial(),
                                Rcpp::Named("X") = state.get_X(),
-                               Rcpp::Named("W") = state.get_W()));
+                               Rcpp::Named("X_initial") = state.get_X_initial(),
+                               Rcpp::Named("W") = state.get_W(),
+                               Rcpp::Named("W_initial") = state.get_W_initial(),
+                               Rcpp::Named("X_all") = state.get_X_all(),
+                               Rcpp::Named("D_all") = state.get_D_all()));
 }
