@@ -34,6 +34,7 @@
 #' @param ar1_rho Numeric. Temporal autocorrelation.
 #' @param t Integer. Number of time points. (Could be inferred from sizes of \code{D} and \code{X}, 
 #' but requiring to be specified as a sanity check.)
+#' @param report_every Integer. The number of iterations after which progress will be displayed.
 #' @value Integer vector (1-indexed) being the indexes of the \code{D}, \code{X}, \code{groups} 
 #' that optimise the optimality criteria.
 #' @example 
@@ -109,7 +110,7 @@
 choose_cells = function(D, X, numbers, n_steps, nu, kappa, resolution, betas, s2rf,
                         groups = NULL, exclusive = FALSE, s_initial = NULL, 
                         family = c("gaussian", "binomial"), Ds_parameters = NULL,
-                        ar1_rho = NULL, t = NULL) {
+                        ar1_rho = NULL, t = NULL, report_every = 1) {
 
   library(magrittr)
   library(INLA) # This is REQUIRED in order for the inla.matern.cov function to work.
@@ -163,7 +164,7 @@ choose_cells = function(D, X, numbers, n_steps, nu, kappa, resolution, betas, s2
                             s_initial - 1, # To 0-indexed. 
                             nu, kappa, resolution, betas, n_steps, family_int, 
                             Ds_parameters - 1, # To 0-indexed.
-                            ar1_rho, t, s2rf
+                            ar1_rho, t, s2rf, report_every
   )
   # Values of s from choose_cells_cpp are 0-indexed. Change them to be 1-indexed.
   result$s = result$s + 1

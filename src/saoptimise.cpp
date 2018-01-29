@@ -423,7 +423,7 @@ public:
 //' candidates = list(a = 1:4, b = 1:4)
 //' weights = list(a = matrix(1, 4, 4) - diag(4),  b = matrix(1, 4, 4) - diag(4))
 //' get_next_state(s, candidates, weights, e = function(x) sum(unlist(x)), temperature = 0.5)
-double get_next_state(State& s, double temperature) {
+double get_next_state(State& s, double temperature, bool report) {
     // Propose new candidate.
     s.propose(temperature);
     // Evaluate energies.
@@ -431,16 +431,22 @@ double get_next_state(State& s, double temperature) {
     double e_proposed = s.evaluate();
     // Choose whether or not to accept.
     double acceptance_prob = (exp(-(e_proposed - e_old) / temperature));
-    Rcout << "Old e: " << e_old << " Proposed e: " << e_proposed 
-          << " Acceptance prob: " << acceptance_prob 
-          << " Temperature: " << temperature << std::endl;
+    if (report) {
+        Rcout << "Old e: " << e_old << " Proposed e: " << e_proposed 
+              << " Acceptance prob: " << acceptance_prob 
+              << " Temperature: " << temperature << std::endl;
+    }
     if ((e_proposed < e_old) || (runif(1)[0] < acceptance_prob)) {
         // Accept proposed state. Just return the new energy.
-        Rcout << "  Accepted proposed state." << std::endl;
+        if (report) {
+            Rcout << "  Accepted proposed state." << std::endl;
+        }
         return(e_proposed);
     } else {
         // Don't accept proposed state. Switch state back to what it was.
-        Rcout << "  Rejected proposed state." << std::endl;
+        if (report) {
+            Rcout << "  Rejected proposed state." << std::endl;
+        }
         s.reject();
         // Return old energy.
         return(e_old);
@@ -474,12 +480,13 @@ double get_next_state(State& s, double temperature) {
 //' @param ar1_rho The temporal autocorrelation.
 //' @param t The number of time points.
 //' @param s2rf The variance of the random field (which, when multiplied by the correlation of the 
+//' @param report_every The number of iterations after which progress will be displayed.
 //' random field, produces the covariance of the random field).
 // [[Rcpp::export]]
 List choose_cells_cpp(arma::mat X, arma::mat D, bool exclusive, arma::uvec grps,
                       arma::uvec s, double nu, double kappa, double resolution, 
                       arma::vec betas, int n_steps, int family, arma::uvec Ds_parameters,
-                      double ar1_rho, int t, double s2rf) {
+                      double ar1_rho, int t, double s2rf, unsigned int report_every) {
     
     Rcout << "In C++..." << std::endl;
     if (exclusive) {
@@ -527,9 +534,15 @@ List choose_cells_cpp(arma::mat X, arma::mat D, bool exclusive, arma::uvec grps,
     
     // Simulated annealing loop.
     double e; // The energy.
+    bool report;
     for (int i_step = 0; i_step < n_steps; ++i_step) {
-        Rcout << "Step " << i_step + 1 << "/" << n_steps << "..." << std::endl;
-        e = get_next_state(state, pow(0.99, i_step));
+        if (i_step % report_every == 0) {
+            report = true;
+            Rcout << "Step " << i_step + 1 << "/" << n_steps << "..." << std::endl;
+        } else {
+            report = false;
+        }
+        e = get_next_state(state, pow(0.99, i_step), report);
         // Retain state if it's the best we've seen.
         if (e < e_best) {
             s_best = state.get_s_clone();
