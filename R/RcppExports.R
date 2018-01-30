@@ -131,9 +131,13 @@ row_col_update_of_matrix_and_inverse <- function(A, A_inv, want, j) {
 #' @param ar1_rho The temporal autocorrelation.
 #' @param t The number of time points.
 #' @param s2rf The variance of the random field (which, when multiplied by the correlation of the 
-#' @param report_every The number of iterations after which progress will be displayed.
 #' random field, produces the covariance of the random field).
-choose_cells_cpp <- function(X, D, exclusive, grps, s, nu, kappa, resolution, betas, n_steps, family, Ds_parameters, ar1_rho, t, s2rf, report_every) {
-    .Call(`_saoptimality_choose_cells_cpp`, X, D, exclusive, grps, s, nu, kappa, resolution, betas, n_steps, family, Ds_parameters, ar1_rho, t, s2rf, report_every)
+#' @param report_every The number of iterations after which progress will be displayed.
+#' @param max_dist If one or more of the groups are too large to allow precomputed weight matrices for
+#' choosing new candidates, points that are within the square centred on the current point,
+#' with side length double \code{max_dist}, will be considered.
+#' @param report_candidates If true, will print the candidates considered at each step, and their selection weights. Slow.
+choose_cells_cpp <- function(X, D, exclusive, grps, s, nu, kappa, resolution, betas, n_steps, family, Ds_parameters, ar1_rho, t, s2rf, report_every, max_dist, report_candidates) {
+    .Call(`_saoptimality_choose_cells_cpp`, X, D, exclusive, grps, s, nu, kappa, resolution, betas, n_steps, family, Ds_parameters, ar1_rho, t, s2rf, report_every, max_dist, report_candidates)
 }
 

@@ -146,8 +146,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // choose_cells_cpp
-List choose_cells_cpp(arma::mat X, arma::mat D, bool exclusive, arma::uvec grps, arma::uvec s, double nu, double kappa, double resolution, arma::vec betas, int n_steps, int family, arma::uvec Ds_parameters, double ar1_rho, int t, double s2rf, unsigned int report_every);
-RcppExport SEXP _saoptimality_choose_cells_cpp(SEXP XSEXP, SEXP DSEXP, SEXP exclusiveSEXP, SEXP grpsSEXP, SEXP sSEXP, SEXP nuSEXP, SEXP kappaSEXP, SEXP resolutionSEXP, SEXP betasSEXP, SEXP n_stepsSEXP, SEXP familySEXP, SEXP Ds_parametersSEXP, SEXP ar1_rhoSEXP, SEXP tSEXP, SEXP s2rfSEXP, SEXP report_everySEXP) {
+List choose_cells_cpp(arma::mat X, arma::mat D, bool exclusive, arma::uvec grps, arma::uvec s, double nu, double kappa, double resolution, arma::vec betas, int n_steps, int family, arma::uvec Ds_parameters, double ar1_rho, int t, double s2rf, unsigned int report_every, double max_dist, bool report_candidates);
+RcppExport SEXP _saoptimality_choose_cells_cpp(SEXP XSEXP, SEXP DSEXP, SEXP exclusiveSEXP, SEXP grpsSEXP, SEXP sSEXP, SEXP nuSEXP, SEXP kappaSEXP, SEXP resolutionSEXP, SEXP betasSEXP, SEXP n_stepsSEXP, SEXP familySEXP, SEXP Ds_parametersSEXP, SEXP ar1_rhoSEXP, SEXP tSEXP, SEXP s2rfSEXP, SEXP report_everySEXP, SEXP max_distSEXP, SEXP report_candidatesSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -167,7 +167,9 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< int >::type t(tSEXP);
     Rcpp::traits::input_parameter< double >::type s2rf(s2rfSEXP);
     Rcpp::traits::input_parameter< unsigned int >::type report_every(report_everySEXP);
-    rcpp_result_gen = Rcpp::wrap(choose_cells_cpp(X, D, exclusive, grps, s, nu, kappa, resolution, betas, n_steps, family, Ds_parameters, ar1_rho, t, s2rf, report_every));
+    Rcpp::traits::input_parameter< double >::type max_dist(max_distSEXP);
+    Rcpp::traits::input_parameter< bool >::type report_candidates(report_candidatesSEXP);
+    rcpp_result_gen = Rcpp::wrap(choose_cells_cpp(X, D, exclusive, grps, s, nu, kappa, resolution, betas, n_steps, family, Ds_parameters, ar1_rho, t, s2rf, report_every, max_dist, report_candidates));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -185,7 +187,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_saoptimality_row_col_update_of_matrix", (DL_FUNC) &_saoptimality_row_col_update_of_matrix, 3},
     {"_saoptimality_row_col_update_of_inverse", (DL_FUNC) &_saoptimality_row_col_update_of_inverse, 4},
     {"_saoptimality_row_col_update_of_matrix_and_inverse", (DL_FUNC) &_saoptimality_row_col_update_of_matrix_and_inverse, 4},
-    {"_saoptimality_choose_cells_cpp", (DL_FUNC) &_saoptimality_choose_cells_cpp, 16},
+    {"_saoptimality_choose_cells_cpp", (DL_FUNC) &_saoptimality_choose_cells_cpp, 18},
     {NULL, NULL, 0}
 };
 

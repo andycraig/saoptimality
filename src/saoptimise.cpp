@@ -143,6 +143,8 @@ private:
     const bool exclusive;
     const double ar1_rho;
     const int t; // Number of time points.
+    const double max_dist; 
+    const bool report_candidates;
     bool use_weight_matrices; // If true, use pre-computed weight matrices for switching probabilities.
     double s2rf; // Variance of random field.
     arma::uvec Ds_non_parameters; // Mask for betas not of interest, for D_s optimality.
@@ -251,11 +253,11 @@ public:
           std::vector<arma::mat> weights_, arma::uvec indices_within_weights_, 
           double nu_, double kappa_, double resolution_, arma::vec betas_, int family_, 
           arma::uvec Ds_parameters, double ar1_rho_, int t_, double s2rf_,
-          bool use_weight_matrices_) : 
+          bool use_weight_matrices_, double max_dist_, bool report_candidates_) : 
     grps(grps_), weights(weights_), indices_within_weights(indices_within_weights_),
     exclusive(exclusive_), nu(nu_), kappa(kappa_), resolution(resolution_), 
     betas(betas_), family(family_), ar1_rho(ar1_rho_), t(t_), s2rf(s2rf_),
-    use_weight_matrices(use_weight_matrices_) {
+    use_weight_matrices(use_weight_matrices_), max_dist(max_dist_), report_candidates(report_candidates_) {
         
         X = X_;
         D = D_;
@@ -263,9 +265,13 @@ public:
         can_reject = false;
         is_Ds = Ds_parameters.size() > 0; 
         if (is_Ds) {
+            Rcout << "Setting D_s optimality..." << std::endl;
             Ds_non_parameters = arma::uvec(betas.size(), arma::fill::ones);
             Ds_non_parameters(Ds_parameters) = arma::uvec(Ds_parameters.size(), arma::fill::zeros);
+        } else {
+            Rcout << "Using D optimality..." << std::endl;
         }
+        Rcout << "Getting locations and covariates for initial state..." << std::endl;
         // Set indexes_in_s to 0:(length(s) - 1). 
         indexes_in_s = arma::linspace<arma::vec>(0, s.size() - 1, s.size());
         // Initialise subsets of X, D for the initial s.
@@ -357,6 +363,9 @@ public:
             } else {
                 weights_available[old_element] = 0; // Zero probability of selecting same candidate.
             }
+            if (report_candidates) {
+                Rcout << "Candidate weights: " << std::endl << weights_available.t() << std::endl;
+            }
             // Update s.
             //TODO Avoid cast to NumericVector.
             arma::uvec indices_of_old_grp = find(grps == grp_of_old_element);
@@ -367,8 +376,6 @@ public:
                                                                        temperature))[0];
         } else {
             // Can't use precomputed weight matrix, so select from nearby elements of same group.
-            //TODO max_dist should not be hard-coded.
-            double max_dist = 10000;
             //TODO There is surely a way of doing this with some version of &.
             arma::uvec find_grp = find((grps == grp_of_old_element)); 
             // Square neighbourhood.
@@ -381,10 +388,14 @@ public:
             }
             // Calculate the weights for those group based on distance from old_element.
             arma::mat D_eligible = D.rows(nearby_candidates);
-            arma::vec weights_available = sqrt(pow(D_eligible.col(0) - D(old_element, 0), 2) +
+            arma::vec weights_available = 1 / sqrt(pow(D_eligible.col(0) - D(old_element, 0), 2) +
                 pow(D_eligible.col(1) - D(old_element, 1), 2));
             // old_element will be in nearby_candidates, so set its weight to 0.
             weights_available.elem(find(nearby_candidates == old_element)) = arma::zeros(1);
+            if (report_candidates) {
+                Rcout << "Nearby candidates: " << std::endl << nearby_candidates.t() << std::endl;
+                Rcout << "Their weights: " << std::endl << weights_available.t() << std::endl;
+            }
             new_candidate = sample(IntegerVector(nearby_candidates.begin(), nearby_candidates.end()), 
                                        1, 
                                        get_annealed_prob(NumericVector(weights_available.begin(), 
@@ -501,13 +512,18 @@ double get_next_state(State& s, double temperature, bool report) {
 //' @param ar1_rho The temporal autocorrelation.
 //' @param t The number of time points.
 //' @param s2rf The variance of the random field (which, when multiplied by the correlation of the 
-//' @param report_every The number of iterations after which progress will be displayed.
 //' random field, produces the covariance of the random field).
+//' @param report_every The number of iterations after which progress will be displayed.
+//' @param max_dist If one or more of the groups are too large to allow precomputed weight matrices for
+//' choosing new candidates, points that are within the square centred on the current point,
+//' with side length double \code{max_dist}, will be considered.
+//' @param report_candidates If true, will print the candidates considered at each step, and their selection weights. Slow.
 // [[Rcpp::export]]
 List choose_cells_cpp(arma::mat X, arma::mat D, bool exclusive, arma::uvec grps,
                       arma::uvec s, double nu, double kappa, double resolution, 
                       arma::vec betas, int n_steps, int family, arma::uvec Ds_parameters,
-                      double ar1_rho, int t, double s2rf, unsigned int report_every) {
+                      double ar1_rho, int t, double s2rf, unsigned int report_every,
+                      double max_dist, bool report_candidates) {
     
     Rcout << "In C++..." << std::endl;
     if (exclusive) {
@@ -537,7 +553,7 @@ List choose_cells_cpp(arma::mat X, arma::mat D, bool exclusive, arma::uvec grps,
         // Create a uvec that can be used to look up an element's index within the weight matrix..
         for (int i_grp = 0; i_grp < n_grps; ++i_grp) {
             arma::uvec indices_for_this_grp = arma::find(grps == i_grp);
-            weights[i_grp] = get_dist_matrix(D.rows(indices_for_this_grp));
+            weights[i_grp] = 1 / get_dist_matrix(D.rows(indices_for_this_grp));
             indices_within_weights.elem(indices_for_this_grp) = arma::linspace<arma::uvec>(0, indices_for_this_grp.size() - 1, indices_for_this_grp.size());
         }
     } else {
@@ -547,7 +563,7 @@ List choose_cells_cpp(arma::mat X, arma::mat D, bool exclusive, arma::uvec grps,
     }
     State state = State(X, D, exclusive, grps, s, weights, indices_within_weights, 
                         nu, kappa, resolution, betas, family, Ds_parameters, ar1_rho, 
-                        t, s2rf, use_weight_matrices);
+                        t, s2rf, use_weight_matrices, max_dist, report_candidates);
     // Initialise best to current.
     IntegerVector s_best = state.get_s_clone();
     double e_initial = state.evaluate();
