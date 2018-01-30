@@ -518,12 +518,13 @@ double get_next_state(State& s, double temperature, bool report) {
 //' choosing new candidates, points that are within the square centred on the current point,
 //' with side length double \code{max_dist}, will be considered.
 //' @param report_candidates If true, will print the candidates considered at each step, and their selection weights. Slow.
+//' @param temperature_alpha Temperature at step k is temperature_alpha ^ k.
 // [[Rcpp::export]]
 List choose_cells_cpp(arma::mat X, arma::mat D, bool exclusive, arma::uvec grps,
                       arma::uvec s, double nu, double kappa, double resolution, 
                       arma::vec betas, int n_steps, int family, arma::uvec Ds_parameters,
                       double ar1_rho, int t, double s2rf, unsigned int report_every,
-                      double max_dist, bool report_candidates) {
+                      double max_dist, bool report_candidates, double temperature_alpha) {
     
     Rcout << "In C++..." << std::endl;
     if (exclusive) {
@@ -579,7 +580,7 @@ List choose_cells_cpp(arma::mat X, arma::mat D, bool exclusive, arma::uvec grps,
         } else {
             report = false;
         }
-        e = get_next_state(state, pow(0.99, i_step), report);
+        e = get_next_state(state, pow(temperature_alpha, i_step), report);
         // Retain state if it's the best we've seen.
         if (e < e_best) {
             s_best = state.get_s_clone();

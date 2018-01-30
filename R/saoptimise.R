@@ -39,6 +39,7 @@
 #' choosing new candidates, points that are within the square centred on the current point,
 #' with side length double \code{max_dist}, will be considered.
 #' @param report_candidates Logical. If true, will print the candidates considered at each step, and their selection weights. Slow.
+#' @param temperature_alpha Numeric. Temperature at step k is \code{temperature_alpha} ^ k.
 #' @value Integer vector (1-indexed) being the indexes of the \code{D}, \code{X}, \code{groups} 
 #' that optimise the optimality criteria.
 #' @example 
@@ -115,7 +116,7 @@ choose_cells = function(D, X, numbers, n_steps, nu, kappa, resolution, betas, s2
                         groups = NULL, exclusive = FALSE, s_initial = NULL, 
                         family = c("gaussian", "binomial"), Ds_parameters = NULL,
                         ar1_rho = NULL, t = NULL, report_every = 1, max_dist = Inf,
-                        report_candidates = FALSE) {
+                        report_candidates = FALSE, temperature_alpha = 0.99) {
 
   library(magrittr)
   library(INLA) # This is REQUIRED in order for the inla.matern.cov function to work.
@@ -172,7 +173,8 @@ choose_cells = function(D, X, numbers, n_steps, nu, kappa, resolution, betas, s2
                             s_initial - 1, # To 0-indexed. 
                             nu, kappa, resolution, betas, n_steps, family_int, 
                             Ds_parameters - 1, # To 0-indexed.
-                            ar1_rho, t, s2rf, report_every, max_dist, report_candidates
+                            ar1_rho, t, s2rf, report_every, max_dist, report_candidates,
+                            temperature_alpha
   )
   # Values of s from choose_cells_cpp are 0-indexed. Change them to be 1-indexed.
   result$s = result$s + 1
