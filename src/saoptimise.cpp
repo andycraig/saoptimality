@@ -372,8 +372,8 @@ public:
             //TODO There is surely a way of doing this with some version of &.
             arma::uvec find_grp = find((grps == grp_of_old_element)); 
             // Square neighbourhood.
-            arma::uvec find_x = find((D.col(0) - D(old_element, 0)) <= max_dist);
-            arma::uvec find_y = find((D.col(1) - D(old_element, 1)) <= max_dist);
+            arma::uvec find_x = find(arma::abs((D.col(0) - D(old_element, 0))) <= max_dist);
+            arma::uvec find_y = find(arma::abs((D.col(1) - D(old_element, 1))) <= max_dist);
             arma::uvec nearby_candidates = intersect(intersect(find_grp, find_x), find_y);
             //TODO Implement for exclusive.
             if (exclusive) {
