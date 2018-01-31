@@ -40,6 +40,8 @@
 #' with side length double \code{max_dist}, will be considered.
 #' @param report_candidates Logical. If true, will print the candidates considered at each step, and their selection weights. Slow.
 #' @param temperature_alpha Numeric. Temperature at step k is \code{temperature_alpha} ^ k.
+#' @param unfrozen_grp One of the groups, as defined in \code{group}. If specified, elements of only that group are ever 
+#' selected to change.
 #' @value Integer vector (1-indexed) being the indexes of the \code{D}, \code{X}, \code{groups} 
 #' that optimise the optimality criteria.
 #' @example 
@@ -82,6 +84,7 @@
 #' groups = rep("a", nrow(D))
 #' ar1_rho = 0
 #' n_steps = 1000
+#' result = choose_cells(D, X, numbers, n_steps, nu, kappa, resolution, betas, s2rf, groups, exclusive, family = family, t = t, ar1_rho = ar1_rho) 
 #' 
 #' # Example with no covariates, high spatial correlation, and Gaussian link.
 #' # Points should be far from each other.
@@ -111,76 +114,115 @@
 #' family = "binomial"
 #' groups = rep("a", nrow(D))
 #' ar1_rho = 0
+#' 
+#' #' # Example with frozen group. Only group b should change.
+#' t = 1
+#' numbers = list(a = 3, b = 4)
+#' nu = 1
+#' range = 0.01 # Distance where covariance becomes about 0.1
+#' kappa =  sqrt(8 * nu) / range # INLA definition.
+#' D = expand.grid(x = seq(-1, 1, by = 0.2), y = seq(-1, 1, by = 0.2))
+#' X = cbind(rep(1, nrow(D)), D$x) # Intercept and x coordinate as covariate.
+#' betas = c(1, 1)
+#' s2rf = 1
+#' resolution = 0.1
+#' exclusive = FALSE
+#' family = "gaussian"
+#' groups = c(rep("a", round(nrow(D) / 2)), rep("b", nrow(D) - round(nrow(D) / 2)))
+#' ar1_rho = 0
+#' n_steps = 1000
+#' unfrozen_grp = "b"
+#' result = choose_cells(D, X, numbers, n_steps, nu, kappa, resolution, betas, s2rf, groups, exclusive, family = family, t = t, ar1_rho = ar1_rho, unfrozen_grp = unfrozen_grp) 
 #' @export
 choose_cells = function(D, X, numbers, n_steps, nu, kappa, resolution, betas, s2rf,
                         groups = NULL, exclusive = FALSE, s_initial = NULL, 
                         family = c("gaussian", "binomial"), Ds_parameters = NULL,
                         ar1_rho = NULL, t = NULL, report_every = 1, max_dist = Inf,
-                        report_candidates = FALSE, temperature_alpha = 0.99) {
-
-  library(magrittr)
-  library(INLA) # This is REQUIRED in order for the inla.matern.cov function to work.
-  #TODO Fix library(INLA) being required.
-  # Check inputs.
-  family <- match.arg(family)
-  if ((nrow(D) * t) != nrow(X)) {f
-    stop(paste0("t (", t, ") times number of rows of D (", nrow(D), ") must be same as number of rows of X (", nrow(X), ").")) 
-  }
-  if (nrow(D) != length(groups)) {
-    stop(paste0("Number of rows of D (", nrow(D), ") and length of groups (", length(groups), ") must be same.")) 
-  }
-  if (ncol(X) != length(betas)) {
-      stop(paste0("Number of cols of X (", ncol(X), ") and length of betas (", length(betas), ") must be same.")) 
-  }
-  
-  # Setup.
-  family_int = which(family == c("gaussian", "binomial")) - 1 # -1 for 0-indexing.
-  if (is.null(groups)) {
-    groups = rep(0, nrow(X)) 
-    group_names = 0
-    groups_int = 0
-  } else {
-    # Convert group names to integers.
-    group_names = unique(groups)
-    if (!setequal(group_names, names(numbers))) {
-      stop("Unique values in groups and names(numbers) must be the same.")
+                        report_candidates = FALSE, temperature_alpha = 0.99,
+                        unfrozen_grp = NULL) {
+    
+    library(magrittr)
+    library(INLA) # This is REQUIRED in order for the inla.matern.cov function to work.
+    #TODO Fix library(INLA) being required.
+    # Check inputs.
+    family <- match.arg(family)
+    if (length(unfrozen_grp) > 1) {
+        stop("Only one unfrozen_grp is permitted.")   
     }
-    groups_lookup = 0:(length(group_names) - 1) %>% `names<-`(group_names)
-    groups_int = groups_lookup[groups] %>% `names<-`(NULL)
-  }
-  
-  if (is.null(s_initial)) {
-    # Allocate intial state randomly.
-    candidates = 1:length(groups_int) # 1-indexed. Will be converted to 0-indexed at cpp function call.
-    for (grp in group_names) {
-      grp_candidates = candidates[groups == grp]
-      # sample behaves differently if first argument has length 1, so handle that case separately.
-      if (length(grp_candidates) == 1) {
-        s_initial = c(s_initial, rep(grp_candidates, numbers[[grp]]))
-      } else { 
-        s_initial = c(s_initial, sample(grp_candidates, numbers[[grp]], replace = !exclusive))
-      }
+    if ((nrow(D) * t) != nrow(X)) {f
+        stop(paste0("t (", t, ") times number of rows of D (", nrow(D), ") must be same as number of rows of X (", nrow(X), ").")) 
     }
-  }  
-  
-  message("Choosing cells...")
-  # Call C++ function to do the work.
-  # Its signature:
-  # List choose_cells_cpp(arma::mat X, arma::mat D, bool exclusive, arma::uvec grps,
-  # arma::uvec s, double nu, double kappa, double resolution, 
-  # arma::vec betas, int n_steps)
-  result = choose_cells_cpp(X, as.matrix(D), exclusive, groups_int, 
-                            s_initial - 1, # To 0-indexed. 
-                            nu, kappa, resolution, betas, n_steps, family_int, 
-                            Ds_parameters - 1, # To 0-indexed.
-                            ar1_rho, t, s2rf, report_every, max_dist, report_candidates,
-                            temperature_alpha
-  )
-  # Values of s from choose_cells_cpp are 0-indexed. Change them to be 1-indexed.
-  result$s = result$s + 1
-  # Add s_initial to results.
-  result$s_initial = s_initial + 1
-  print("Finished choosing cell.")
-  result
+    if (nrow(D) != length(groups)) {
+        stop(paste0("Number of rows of D (", nrow(D), ") and length of groups (", length(groups), ") must be same.")) 
+    }
+    if (ncol(X) != length(betas)) {
+        stop(paste0("Number of cols of X (", ncol(X), ") and length of betas (", length(betas), ") must be same.")) 
+    }
+    
+    # Setup.
+    family_int = which(family == c("gaussian", "binomial")) - 1 # -1 for 0-indexing.
+    if (is.null(groups)) {
+        if (!is.null(unfrozen_grp)) {
+            stop("unfrozen_grp was specified but groups was not.")   
+        }
+        groups = rep(0, nrow(X)) 
+        group_names = 0
+        groups_int = 0
+    } else {
+        # Convert group names to integers.
+        group_names = unique(groups)
+        if (!setequal(group_names, names(numbers))) {
+            stop("Unique values in groups and names(numbers) must be the same.")
+        }
+        groups_lookup = 0:(length(group_names) - 1) %>% `names<-`(group_names)
+        groups_int = groups_lookup[groups] %>% `names<-`(NULL)
+    }
+    
+    if (!is.null(unfrozen_grp)) {
+        use_frozen_grps = TRUE 
+        unfrozen_grp_int = groups_lookup[unfrozen_grp]
+    } else {
+        use_frozen_grps = FALSE  
+        unfrozen_grp_int = 999;
+    }
+    
+    message(paste0("Before checking s_initial, s_initial: ", s_initial))
+    if (is.null(s_initial)) {
+        message("Allocating initial state randomly...")
+        # Allocate intial state randomly.
+        candidates = 1:length(groups_int) # 1-indexed. Will be converted to 0-indexed at cpp function call.
+        for (grp in group_names) {
+            grp_candidates = candidates[groups == grp]
+            # sample behaves differently if first argument has length 1, so handle that case separately.
+            if (length(grp_candidates) == 1) {
+                s_initial = c(s_initial, rep(grp_candidates, numbers[[grp]]))
+            } else { 
+                s_initial = c(s_initial, sample(grp_candidates, numbers[[grp]], replace = !exclusive))
+            }
+        }
+    }  else {
+        message(paste0("Got s_initial: ", s_initial))   
+    }
+    message(paste0(s_initial))
+    s_initial_zero_indexed = s_initial - 1
+    message("Choosing cells...")
+    # Call C++ function to do the work.
+    # Its signature:
+    # List choose_cells_cpp(arma::mat X, arma::mat D, bool exclusive, arma::uvec grps,
+    # arma::uvec s, double nu, double kappa, double resolution, 
+    # arma::vec betas, int n_steps)
+    result = choose_cells_cpp(X, as.matrix(D), exclusive, groups_int, 
+                              s_initial_zero_indexed, 
+                              nu, kappa, resolution, betas, n_steps, family_int, 
+                              Ds_parameters - 1, # To 0-indexed.
+                              ar1_rho, t, s2rf, report_every, max_dist, report_candidates,
+                              temperature_alpha, use_frozen_grps, unfrozen_grp_int
+    )
+    # Values of s from choose_cells_cpp are 0-indexed. Change them to be 1-indexed.
+    result$s = result$s + 1
+    # Add s_initial to results.
+    result$s_initial = s_initial # 1-indexed.
+    print("Finished choosing cell.")
+    result
 }
 

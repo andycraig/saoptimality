@@ -145,6 +145,8 @@ private:
     const int t; // Number of time points.
     const double max_dist; 
     const bool report_candidates;
+    const bool use_frozen_grps;
+    const unsigned int unfrozen_grp; 
     bool use_weight_matrices; // If true, use pre-computed weight matrices for switching probabilities.
     double s2rf; // Variance of random field.
     arma::uvec Ds_non_parameters; // Mask for betas not of interest, for D_s optimality.
@@ -253,11 +255,13 @@ public:
           std::vector<arma::mat> weights_, arma::uvec indices_within_weights_, 
           double nu_, double kappa_, double resolution_, arma::vec betas_, int family_, 
           arma::uvec Ds_parameters, double ar1_rho_, int t_, double s2rf_,
-          bool use_weight_matrices_, double max_dist_, bool report_candidates_) : 
+          bool use_weight_matrices_, double max_dist_, bool report_candidates_,
+          bool use_frozen_grps_, unsigned int unfrozen_grp_) : 
     grps(grps_), weights(weights_), indices_within_weights(indices_within_weights_),
     exclusive(exclusive_), nu(nu_), kappa(kappa_), resolution(resolution_), 
     betas(betas_), family(family_), ar1_rho(ar1_rho_), t(t_), s2rf(s2rf_),
-    use_weight_matrices(use_weight_matrices_), max_dist(max_dist_), report_candidates(report_candidates_) {
+    use_weight_matrices(use_weight_matrices_), max_dist(max_dist_), report_candidates(report_candidates_),
+    use_frozen_grps(use_frozen_grps_), unfrozen_grp(unfrozen_grp_) {
         
         X = X_;
         D = D_;
@@ -344,7 +348,13 @@ public:
     // Proposes a new state by switching one element.
     void propose(double temperature) {
         can_reject = true;
-        index_in_s_to_switch = sample(indexes_in_s, 1)[0]; // The index of the item in s to switch.
+        if (use_frozen_grps) {
+            arma::uvec unfrozen_indexes_in_s = find(grps.elem(s) == unfrozen_grp); // Indexes of s in unfrozen_grp.
+            IntegerVector unfrozen_indexes_in_s_IntVec = IntegerVector(unfrozen_indexes_in_s.begin(), unfrozen_indexes_in_s.end()); // Copy of eligible_2, for sampling.
+            index_in_s_to_switch = sample(unfrozen_indexes_in_s_IntVec, 1)[0];
+        } else {
+            index_in_s_to_switch = sample(indexes_in_s, 1)[0]; // The index of the item in s to switch. indexes_in_s is just 0:(length(s) - 1).
+        }
         // Record the element we'll replace.
         old_element = s[index_in_s_to_switch]; // The value of the item in s to switch.
         // Want to replace with an element from the same group, so check that. 
@@ -519,12 +529,15 @@ double get_next_state(State& s, double temperature, bool report) {
 //' with side length double \code{max_dist}, will be considered.
 //' @param report_candidates If true, will print the candidates considered at each step, and their selection weights. Slow.
 //' @param temperature_alpha Temperature at step k is temperature_alpha ^ k.
+//' @param use_frozen_grps If true, only one group (specified by \code{unfrozen_grp}) is ever selected to change.
+//' @param unfrozen_grp The one group that is allowed to change, if \code{use_frozen_grps} is true.
 // [[Rcpp::export]]
 List choose_cells_cpp(arma::mat X, arma::mat D, bool exclusive, arma::uvec grps,
                       arma::uvec s, double nu, double kappa, double resolution, 
                       arma::vec betas, int n_steps, int family, arma::uvec Ds_parameters,
                       double ar1_rho, int t, double s2rf, unsigned int report_every,
-                      double max_dist, bool report_candidates, double temperature_alpha) {
+                      double max_dist, bool report_candidates, double temperature_alpha,
+                      bool use_frozen_grps, unsigned int unfrozen_grp) {
     
     Rcout << "In C++..." << std::endl;
     if (exclusive) {
@@ -564,7 +577,8 @@ List choose_cells_cpp(arma::mat X, arma::mat D, bool exclusive, arma::uvec grps,
     }
     State state = State(X, D, exclusive, grps, s, weights, indices_within_weights, 
                         nu, kappa, resolution, betas, family, Ds_parameters, ar1_rho, 
-                        t, s2rf, use_weight_matrices, max_dist, report_candidates);
+                        t, s2rf, use_weight_matrices, max_dist, report_candidates,
+                        use_frozen_grps, unfrozen_grp);
     // Initialise best to current.
     IntegerVector s_best = state.get_s_clone();
     double e_initial = state.evaluate();
