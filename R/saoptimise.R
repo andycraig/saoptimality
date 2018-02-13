@@ -42,8 +42,12 @@
 #' @param temperature_alpha Numeric. Temperature at step k is \code{temperature_alpha} ^ k.
 #' @param unfrozen_grp One of the groups, as defined in \code{group}. If specified, elements of only that group are ever 
 #' selected to change.
-#' @value Integer vector (1-indexed) being the indexes of the \code{D}, \code{X}, \code{groups} 
-#' that optimise the optimality criteria.
+#' @value List. Includes "s", an integer vector (1-indexed) being the indexes of the \code{D}, \code{X}, \code{groups} 
+#' that optimise the optimality criteria. Includes "summary", a data frame that includes columns 
+#' "proposed_index_to_switch", which gives the (1-indexed) index of the state vector that were proposed to be changed 
+#' at each step, and "proposed_s", which gives the (1_indexed) index of \code{D}, \code{X} etc. that was proposed. The 
+#' first row of "summary" corresponds to the first step. "summary" can be used to reconstruct all the states that were 
+#' considered.
 #' @example 
 #' # Very simple 2 x 2 example
 #' numbers = list(a = 1, b = 1)
@@ -215,11 +219,13 @@ choose_cells = function(D, X, numbers, n_steps, nu, kappa, resolution, betas, s2
                               ar1_rho, t, s2rf, report_every, max_dist, report_candidates,
                               temperature_alpha, use_frozen_grps, unfrozen_grp_int
     )
-    # Values of s from choose_cells_cpp are 0-indexed. Change them to be 1-indexed.
-    result$s = result$s + 1
-    # Add s_initial to results.
-    result$s_initial = s_initial # 1-indexed.
     print("Finished choosing cell.")
+    # Values from choose_cells_cpp are 0-indexed. Change them to be 1-indexed.
+    result$s = result$s + 1
+    result$summary$proposed_index_to_switch = result$summary$proposed_index_to_switch + 1
+    result$summary$proposed_s = result$summary$proposed_s + 1
+    # Add s_initial to results.
+    result$s_initial = s_initial # Already 1-indexed.
     result
 }
 

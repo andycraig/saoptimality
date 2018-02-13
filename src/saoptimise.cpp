@@ -3,6 +3,15 @@ using namespace Rcpp;
 
 // [[Rcpp::depends(RcppArmadillo)]]
 
+// Structure to facilitate passing multiple values back from get_next_state().
+struct step_summary { 
+    double e_old;  
+    double e_proposed; 
+    unsigned int index_to_switch; 
+    unsigned int proposed_s; 
+    bool accepted;
+};
+
 //' @param a x, y coordinates of first point.
 //' @param b x, y coordinates of second point.
 // [[Rcpp::export]]
@@ -338,7 +347,7 @@ public:
                 W = arma::diagmat(w);
             }
         }
-        W_initial = W + 0;
+        W_initial = W + 0; // Copy.
         
         // Compute optimality criterion.
         calculate_d_optimality(); // 
@@ -428,8 +437,10 @@ public:
             ::Rf_error("Trying to reject without having made a proposal. Indicates bad program logic."); 
         }
     }
-    // Get current s.
+    // Get info about s.
     IntegerVector get_s_clone() {return IntegerVector(s.begin(), s.end());}
+    unsigned int get_index_in_s_to_switch() {return index_in_s_to_switch;}
+    unsigned int get_s_at_index_in_s_to_switch() {return s(index_in_s_to_switch);}
     // Get current D-optimality components.
     arma::mat get_C_spatial() {return C_spatial;}
     arma::mat get_C_temporal() {return C_temporal;}
@@ -465,12 +476,18 @@ public:
 //' candidates = list(a = 1:4, b = 1:4)
 //' weights = list(a = matrix(1, 4, 4) - diag(4),  b = matrix(1, 4, 4) - diag(4))
 //' get_next_state(s, candidates, weights, e = function(x) sum(unlist(x)), temperature = 0.5)
-double get_next_state(State& s, double temperature, bool report) {
+step_summary get_next_state(State& s, double temperature, bool report) {
     // Propose new candidate.
     s.propose(temperature);
     // Evaluate energies.
     double e_old = s.evaluate_previous();
     double e_proposed = s.evaluate();
+    // Record.
+    step_summary this_step_summary;
+    this_step_summary.index_to_switch = s.get_index_in_s_to_switch();
+    this_step_summary.proposed_s = s.get_s_at_index_in_s_to_switch();
+    this_step_summary.e_old = e_old;
+    this_step_summary.e_proposed = e_proposed;
     // Choose whether or not to accept.
     double acceptance_prob = (exp(-(e_proposed - e_old) / temperature));
     if (report) {
@@ -483,7 +500,7 @@ double get_next_state(State& s, double temperature, bool report) {
         if (report) {
             Rcout << "  Accepted proposed state." << std::endl;
         }
-        return(e_proposed);
+        this_step_summary.accepted = true;
     } else {
         // Don't accept proposed state. Switch state back to what it was.
         if (report) {
@@ -491,8 +508,9 @@ double get_next_state(State& s, double temperature, bool report) {
         }
         s.reject();
         // Return old energy.
-        return(e_old);
+        this_step_summary.accepted = false;
     }
+    return this_step_summary;
 }
 
 //' Choose cells to maximise an optimal experimental design objective,
@@ -585,6 +603,10 @@ List choose_cells_cpp(arma::mat X, arma::mat D, bool exclusive, arma::uvec grps,
     double e_best = e_initial;
     
     // Simulated annealing loop.
+    step_summary this_step_summary;
+    LogicalVector summary_accepted = LogicalVector(n_steps);
+    IntegerVector summary_index_in_s_to_switch = IntegerVector(n_steps);
+    IntegerVector summary_proposed_s = IntegerVector(n_steps);
     double e; // The energy.
     bool report;
     for (int i_step = 0; i_step < n_steps; ++i_step) {
@@ -594,12 +616,17 @@ List choose_cells_cpp(arma::mat X, arma::mat D, bool exclusive, arma::uvec grps,
         } else {
             report = false;
         }
-        e = get_next_state(state, pow(temperature_alpha, i_step), report);
+        this_step_summary = get_next_state(state, pow(temperature_alpha, i_step), report);
+        e = this_step_summary.accepted ? this_step_summary.e_proposed : this_step_summary.e_old;
         // Retain state if it's the best we've seen.
         if (e < e_best) {
             s_best = state.get_s_clone();
             e_best = e;
         }
+        // Record what was proposed, and whether it was accepted.
+        summary_accepted[i_step] = this_step_summary.accepted;
+        summary_index_in_s_to_switch[i_step] = this_step_summary.index_to_switch;
+        summary_proposed_s[i_step] = this_step_summary.proposed_s;
     }
     Rcout << "Done. Final e: " << e_best << " Initial e: " << e_initial << std::endl;
     
@@ -622,5 +649,9 @@ List choose_cells_cpp(arma::mat X, arma::mat D, bool exclusive, arma::uvec grps,
                                Rcpp::Named("W") = state.get_W(),
                                Rcpp::Named("W_initial") = state.get_W_initial(),
                                Rcpp::Named("X_all") = state.get_X_all(),
-                               Rcpp::Named("D_all") = state.get_D_all()));
+                               Rcpp::Named("D_all") = state.get_D_all(),
+                               Rcpp::Named("summary") = 
+                                   Rcpp::DataFrame::create(Named("accepted") = summary_accepted, 
+                                                           Named("proposed_index_to_switch") = summary_index_in_s_to_switch,
+                                                           Named("proposed_s") = summary_proposed_s)));
 }
