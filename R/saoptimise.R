@@ -186,7 +186,6 @@ choose_cells = function(D, X, numbers, n_steps, nu, kappa, resolution, betas, s2
         unfrozen_grp_int = 999;
     }
     
-    message(paste0("Before checking s_initial, s_initial: ", s_initial))
     if (is.null(s_initial)) {
         message("Allocating initial state randomly...")
         # Allocate intial state randomly.
@@ -200,11 +199,9 @@ choose_cells = function(D, X, numbers, n_steps, nu, kappa, resolution, betas, s2
                 s_initial = c(s_initial, sample(grp_candidates, numbers[[grp]], replace = !exclusive))
             }
         }
-    }  else {
-        message(paste0("Got s_initial: ", s_initial))   
     }
-    message(paste0(s_initial))
     s_initial_zero_indexed = s_initial - 1
+    
     message("Choosing cells...")
     # Call C++ function to do the work.
     # Its signature:
