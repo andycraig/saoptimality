@@ -208,7 +208,6 @@ private:
         // If family == 0 (Gaussian), W is always identity and don't need to do anything.
         if (family == 1) { // Logistic/binomial
             // Need to update t elements.
-            //TODO Update t rows of W.
             int s_X_start = index_in_s_to_switch * t;
             int s_X_end = (index_in_s_to_switch + 1) * t - 1;
             arma::vec p_y_j = 1 / (1 + exp(-1 * s_X.rows(s_X_start, s_X_end) * betas));
@@ -229,7 +228,7 @@ private:
         // Rcout << "W " << std::endl << W << std::endl;
         //Rcout << "Information matrix before taking det " << std::endl << s_X.t() * C_inv * W * s_X << std::endl;
         // Using identity that inv(s2rf * kron(A, B)) = 1 / s2rf * kron(inv(a), inv(B)).
-        arma::mat numerator_matrix = 1 / s2rf * s_X.t() * kron(C_temporal_inv, C_spatial_inv) * W * s_X;
+        arma::mat numerator_matrix = get_information_matrix();
         if (is_Ds) {
             // D_s optimality.
             e = -1 * log(det(numerator_matrix) / det(numerator_matrix(Ds_non_parameters, Ds_non_parameters)));
@@ -437,6 +436,18 @@ public:
             ::Rf_error("Trying to reject without having made a proposal. Indicates bad program logic."); 
         }
     }
+    // Calculate information matrix, which is used to calculate optimality criterion.
+    arma::mat get_information_matrix() {
+        // Rcout << "Calculating D-optimality..." << std::endl;
+        // Rcout << "s_X" << std::endl<< s_X << std::endl;
+        // Rcout << "C_temporal_inv" << std::endl<< C_temporal_inv << std::endl;
+        // Rcout << "C_spatial_inv" << std::endl<< C_spatial_inv << std::endl;
+        // Rcout << "C" << std::endl<< kron(C_temporal_inv, C_spatial_inv) << std::endl;
+        // Rcout << "W " << std::endl << W << std::endl;
+        //Rcout << "Information matrix before taking det " << std::endl << s_X.t() * C_inv * W * s_X << std::endl;
+        // Using identity that inv(s2rf * kron(A, B)) = 1 / s2rf * kron(inv(a), inv(B)).
+        return (1 / s2rf * s_X.t() * kron(C_temporal_inv, C_spatial_inv) * W * s_X);
+    }
     // Get info about s.
     IntegerVector get_s_clone() {return IntegerVector(s.begin(), s.end());}
     unsigned int get_index_in_s_to_switch() {return index_in_s_to_switch;}
@@ -637,21 +648,22 @@ List choose_cells_cpp(arma::mat X, arma::mat D, bool exclusive, arma::uvec grps,
                                Rcpp::Named("C_spatial") = state.get_C_spatial(),
                                Rcpp::Named("C_temporal_inv") = state.get_C_temporal_inv(),
                                Rcpp::Named("C_spatial_inv") = state.get_C_spatial_inv(),
-                               Rcpp::Named("C_temporal_initial") = state.get_C_temporal_initial(),
-                               Rcpp::Named("C_spatial_initial") = state.get_C_spatial_initial(),
-                               Rcpp::Named("C_temporal_inv_initial") = state.get_C_temporal_inv_initial(),
-                               Rcpp::Named("C_spatial_inv_initial") = state.get_C_spatial_inv_initial(),
+			       Rcpp::Named("initial") = Rcpp::List::create(
+                                   Rcpp::Named("C_temporal") = state.get_C_temporal_initial(),
+                                   Rcpp::Named("C_spatial") = state.get_C_spatial_initial(),
+                                   Rcpp::Named("C_temporal_inv") = state.get_C_temporal_inv_initial(),
+                                   Rcpp::Named("C_spatial_inv") = state.get_C_spatial_inv_initial(),
+                                   Rcpp::Named("D") = state.get_D_initial(),
+                                   Rcpp::Named("X") = state.get_X_initial(),
+                                   Rcpp::Named("W") = state.get_W_initial()),
                                Rcpp::Named("s2rf") = s2rf,
                                Rcpp::Named("D") = state.get_D(),
-                               Rcpp::Named("D_initial") = state.get_D_initial(),
                                Rcpp::Named("X") = state.get_X(),
-                               Rcpp::Named("X_initial") = state.get_X_initial(),
                                Rcpp::Named("W") = state.get_W(),
-                               Rcpp::Named("W_initial") = state.get_W_initial(),
                                Rcpp::Named("X_all") = state.get_X_all(),
                                Rcpp::Named("D_all") = state.get_D_all(),
-                               Rcpp::Named("summary") = 
-                                   Rcpp::DataFrame::create(Named("accepted") = summary_accepted, 
-                                                           Named("proposed_index_to_switch") = summary_index_in_s_to_switch,
-                                                           Named("proposed_s") = summary_proposed_s)));
+                               Rcpp::Named("info_matrix") = state.get_information_matrix(),
+                               Rcpp::Named("summary") = Rcpp::DataFrame::create(Named("accepted") = summary_accepted, 
+                                           Named("proposed_index_to_switch") = summary_index_in_s_to_switch,
+                                           Named("proposed_s") = summary_proposed_s)));
 }
