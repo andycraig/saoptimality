@@ -45,7 +45,7 @@ arma::mat get_dist_matrix(const arma::mat& D) {
 }
 
 //' Do a fast rank-one update of an inverted matrix,
-//' using the Sherman–Morrison formula, such that:
+//' using the Sherman-Morrison formula, such that:
 //' A^-1 -> (A + u v)^-1
 //' @param A_inv n x n matrix, already inverted.
 //' @param u n x 1 matrix.
@@ -157,7 +157,8 @@ private:
     const bool use_frozen_grps;
     const unsigned int unfrozen_grp; 
     bool use_weight_matrices; // If true, use pre-computed weight matrices for switching probabilities.
-    double s2rf; // Variance of random field.
+    const double s2rf; // Variance of random field.
+    const double s2e; // Variance of uncorrelated noise.
     arma::uvec Ds_non_parameters; // Mask for betas not of interest, for D_s optimality.
     bool is_Ds; // true to calculate Ds optimality, false for D optimality.
     arma::mat C_temporal, C_temporal_inv, C_spatial, C_spatial_inv, W; // For caching parts of optimality calculation.
@@ -220,14 +221,6 @@ private:
     void calculate_d_optimality() {
         // Re-compute optimality criterion.
         // We seek to MINIMISE this criterion e. Small means a larger information matrix determinant.
-        // Rcout << "Calculating D-optimality..." << std::endl;
-        // Rcout << "s_X" << std::endl<< s_X << std::endl;
-        // Rcout << "C_temporal_inv" << std::endl<< C_temporal_inv << std::endl;
-        // Rcout << "C_spatial_inv" << std::endl<< C_spatial_inv << std::endl;
-        // Rcout << "C" << std::endl<< kron(C_temporal_inv, C_spatial_inv) << std::endl;
-        // Rcout << "W " << std::endl << W << std::endl;
-        //Rcout << "Information matrix before taking det " << std::endl << s_X.t() * C_inv * W * s_X << std::endl;
-        // Using identity that inv(s2rf * kron(A, B)) = 1 / s2rf * kron(inv(a), inv(B)).
         arma::mat numerator_matrix = get_information_matrix();
         if (is_Ds) {
             // D_s optimality.
@@ -264,12 +257,12 @@ public:
           double nu_, double kappa_, double resolution_, arma::vec betas_, int family_, 
           arma::uvec Ds_parameters, double ar1_rho_, int t_, double s2rf_,
           bool use_weight_matrices_, double max_dist_, bool report_candidates_,
-          bool use_frozen_grps_, unsigned int unfrozen_grp_) : 
+          bool use_frozen_grps_, unsigned int unfrozen_grp_, double s2e_) : 
     grps(grps_), weights(weights_), indices_within_weights(indices_within_weights_),
     exclusive(exclusive_), nu(nu_), kappa(kappa_), resolution(resolution_), 
     betas(betas_), family(family_), ar1_rho(ar1_rho_), t(t_), s2rf(s2rf_),
     use_weight_matrices(use_weight_matrices_), max_dist(max_dist_), report_candidates(report_candidates_),
-    use_frozen_grps(use_frozen_grps_), unfrozen_grp(unfrozen_grp_) {
+    use_frozen_grps(use_frozen_grps_), unfrozen_grp(unfrozen_grp_), s2e(s2e_) {
         
         X = X_;
         D = D_;
@@ -388,10 +381,10 @@ public:
             //TODO Avoid cast to NumericVector.
             arma::uvec indices_of_old_grp = find(grps == grp_of_old_element);
             new_candidate = sample(IntegerVector(indices_of_old_grp.begin(), indices_of_old_grp.end()), 
-                                       1, 
-                                       get_annealed_prob(NumericVector(weights_available.begin(), 
-                                                                       weights_available.end()),
-                                                                       temperature))[0];
+                                   1, 
+                                   get_annealed_prob(NumericVector(weights_available.begin(), 
+                                                                   weights_available.end()),
+                                                                   temperature))[0];
         } else {
             // Can't use precomputed weight matrix, so select from nearby elements of same group.
             //TODO There is surely a way of doing this with some version of &.
@@ -415,10 +408,10 @@ public:
                 Rcout << "Their weights: " << std::endl << weights_available.t() << std::endl;
             }
             new_candidate = sample(IntegerVector(nearby_candidates.begin(), nearby_candidates.end()), 
-                                       1, 
-                                       get_annealed_prob(NumericVector(weights_available.begin(), 
-                                                                       weights_available.end()),
-                                                                       temperature))[0];
+                                   1, 
+                                   get_annealed_prob(NumericVector(weights_available.begin(), 
+                                                                   weights_available.end()),
+                                                                   temperature))[0];
         }
         // Update e.
         e_old_old = e_old;
@@ -438,15 +431,17 @@ public:
     }
     // Calculate information matrix, which is used to calculate optimality criterion.
     arma::mat get_information_matrix() {
-        // Rcout << "Calculating D-optimality..." << std::endl;
         // Rcout << "s_X" << std::endl<< s_X << std::endl;
         // Rcout << "C_temporal_inv" << std::endl<< C_temporal_inv << std::endl;
         // Rcout << "C_spatial_inv" << std::endl<< C_spatial_inv << std::endl;
         // Rcout << "C" << std::endl<< kron(C_temporal_inv, C_spatial_inv) << std::endl;
         // Rcout << "W " << std::endl << W << std::endl;
-        //Rcout << "Information matrix before taking det " << std::endl << s_X.t() * C_inv * W * s_X << std::endl;
-        // Using identity that inv(s2rf * kron(A, B)) = 1 / s2rf * kron(inv(a), inv(B)).
-        return (1 / s2rf * s_X.t() * kron(C_temporal_inv, C_spatial_inv) * W * s_X);
+        // Using identity that inv(k * kron(A, B)) = 1 / k * kron(inv(a), inv(B)).
+        arma::mat spatio_temporal = s2rf / (s2rf + s2e) * kron(C_temporal, C_spatial);
+        spatio_temporal.diag().ones(); 
+        //TODO Currently re-inverting spatio-temporal matrix each time information matrix is got.
+        arma::mat information_matrix = s_X.t() * spatio_temporal.i() * W * s_X;
+        return (information_matrix);
     }
     // Get info about s.
     IntegerVector get_s_clone() {return IntegerVector(s.begin(), s.end());}
@@ -560,13 +555,14 @@ step_summary get_next_state(State& s, double temperature, bool report) {
 //' @param temperature_alpha Temperature at step k is temperature_alpha ^ k.
 //' @param use_frozen_grps If true, only one group (specified by \code{unfrozen_grp}) is ever selected to change.
 //' @param unfrozen_grp The one group that is allowed to change, if \code{use_frozen_grps} is true.
+//' @param s2e The variance of the uncorrelated noise.
 // [[Rcpp::export]]
 List choose_cells_cpp(arma::mat X, arma::mat D, bool exclusive, arma::uvec grps,
                       arma::uvec s, double nu, double kappa, double resolution, 
                       arma::vec betas, int n_steps, int family, arma::uvec Ds_parameters,
                       double ar1_rho, int t, double s2rf, unsigned int report_every,
                       double max_dist, bool report_candidates, double temperature_alpha,
-                      bool use_frozen_grps, unsigned int unfrozen_grp) {
+                      bool use_frozen_grps, unsigned int unfrozen_grp, double s2e) {
     
     Rcout << "In C++..." << std::endl;
     if (exclusive) {
@@ -607,7 +603,7 @@ List choose_cells_cpp(arma::mat X, arma::mat D, bool exclusive, arma::uvec grps,
     State state = State(X, D, exclusive, grps, s, weights, indices_within_weights, 
                         nu, kappa, resolution, betas, family, Ds_parameters, ar1_rho, 
                         t, s2rf, use_weight_matrices, max_dist, report_candidates,
-                        use_frozen_grps, unfrozen_grp);
+                        use_frozen_grps, unfrozen_grp, s2e);
     // Initialise best to current.
     IntegerVector s_best = state.get_s_clone();
     double e_initial = state.evaluate();
@@ -648,7 +644,7 @@ List choose_cells_cpp(arma::mat X, arma::mat D, bool exclusive, arma::uvec grps,
                                Rcpp::Named("C_spatial") = state.get_C_spatial(),
                                Rcpp::Named("C_temporal_inv") = state.get_C_temporal_inv(),
                                Rcpp::Named("C_spatial_inv") = state.get_C_spatial_inv(),
-			       Rcpp::Named("initial") = Rcpp::List::create(
+                               Rcpp::Named("initial") = Rcpp::List::create(
                                    Rcpp::Named("C_temporal") = state.get_C_temporal_initial(),
                                    Rcpp::Named("C_spatial") = state.get_C_spatial_initial(),
                                    Rcpp::Named("C_temporal_inv") = state.get_C_temporal_inv_initial(),
@@ -656,14 +652,15 @@ List choose_cells_cpp(arma::mat X, arma::mat D, bool exclusive, arma::uvec grps,
                                    Rcpp::Named("D") = state.get_D_initial(),
                                    Rcpp::Named("X") = state.get_X_initial(),
                                    Rcpp::Named("W") = state.get_W_initial()),
-                               Rcpp::Named("s2rf") = s2rf,
-                               Rcpp::Named("D") = state.get_D(),
-                               Rcpp::Named("X") = state.get_X(),
-                               Rcpp::Named("W") = state.get_W(),
-                               Rcpp::Named("X_all") = state.get_X_all(),
-                               Rcpp::Named("D_all") = state.get_D_all(),
-                               Rcpp::Named("info_matrix") = state.get_information_matrix(),
-                               Rcpp::Named("summary") = Rcpp::DataFrame::create(Named("accepted") = summary_accepted, 
-                                           Named("proposed_index_to_switch") = summary_index_in_s_to_switch,
-                                           Named("proposed_s") = summary_proposed_s)));
+                                   Rcpp::Named("s2rf") = s2rf,
+                                   Rcpp::Named("s2e") = s2e,
+                                   Rcpp::Named("D") = state.get_D(),
+                                   Rcpp::Named("X") = state.get_X(),
+                                   Rcpp::Named("W") = state.get_W(),
+                                   Rcpp::Named("X_all") = state.get_X_all(),
+                                   Rcpp::Named("D_all") = state.get_D_all(),
+                                   Rcpp::Named("info_matrix") = state.get_information_matrix(),
+                                   Rcpp::Named("summary") = Rcpp::DataFrame::create(Named("accepted") = summary_accepted, 
+                                               Named("proposed_index_to_switch") = summary_index_in_s_to_switch,
+                                               Named("proposed_s") = summary_proposed_s)));
 }

@@ -68,7 +68,7 @@ get_dist_matrix <- function(D) {
 }
 
 #' Do a fast rank-one update of an inverted matrix,
-#' using the Sherman–Morrison formula, such that:
+#' using the Sherman-Morrison formula, such that:
 #' A^-1 -> (A + u v)^-1
 #' @param A_inv n x n matrix, already inverted.
 #' @param u n x 1 matrix.
@@ -140,7 +140,8 @@ row_col_update_of_matrix_and_inverse <- function(A, A_inv, want, j) {
 #' @param temperature_alpha Temperature at step k is temperature_alpha ^ k.
 #' @param use_frozen_grps If true, only one group (specified by \code{unfrozen_grp}) is ever selected to change.
 #' @param unfrozen_grp The one group that is allowed to change, if \code{use_frozen_grps} is true.
-choose_cells_cpp <- function(X, D, exclusive, grps, s, nu, kappa, resolution, betas, n_steps, family, Ds_parameters, ar1_rho, t, s2rf, report_every, max_dist, report_candidates, temperature_alpha, use_frozen_grps, unfrozen_grp) {
-    .Call(`_saoptimality_choose_cells_cpp`, X, D, exclusive, grps, s, nu, kappa, resolution, betas, n_steps, family, Ds_parameters, ar1_rho, t, s2rf, report_every, max_dist, report_candidates, temperature_alpha, use_frozen_grps, unfrozen_grp)
+#' @param s2e The variance of the uncorrelated noise.
+choose_cells_cpp <- function(X, D, exclusive, grps, s, nu, kappa, resolution, betas, n_steps, family, Ds_parameters, ar1_rho, t, s2rf, report_every, max_dist, report_candidates, temperature_alpha, use_frozen_grps, unfrozen_grp, s2e) {
+    .Call(`_saoptimality_choose_cells_cpp`, X, D, exclusive, grps, s, nu, kappa, resolution, betas, n_steps, family, Ds_parameters, ar1_rho, t, s2rf, report_every, max_dist, report_candidates, temperature_alpha, use_frozen_grps, unfrozen_grp, s2e)
 }
 

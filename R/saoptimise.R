@@ -20,8 +20,9 @@
 #' a fraction of this will be added to one of them so that they aren't at exactly the same place.
 #' @param betas Numeric vector of length p. Estimates of the regression coefficients. Used
 #' to computer the weight matrix if \code{family} is not "gaussian".
-#' @param s2rf The variance of the random field (which, when multiplied by the correlation of the 
+#' @param s2rf Numeric. The variance of the random field (which, when multiplied by the correlation of the 
 #' random field, produces the covariance of the random field).
+#' @param s2rf Numeric. The variance of the uncorrelated noise.
 #' @param groups Integer vector. Either length N, with the ith element being the group of the ith unit, 
 #' or \code{NULL}, which is equivalent to all elements belonging to the same group.
 #' @param exclusive If \code{FALSE}, the same candidate can be in the state multiple times.
@@ -82,13 +83,14 @@
 #' X = cbind(rep(1, nrow(D)), D$x) # Intercept and x coordinate as covariate.
 #' betas = c(1, 1)
 #' s2rf = 1
+#' s2e = 1
 #' resolution = 0.1
 #' exclusive = FALSE
 #' family = "gaussian"
 #' groups = rep("a", nrow(D))
 #' ar1_rho = 0
 #' n_steps = 1000
-#' result = choose_cells(D, X, numbers, n_steps, nu, kappa, resolution, betas, s2rf, groups, exclusive, family = family, t = t, ar1_rho = ar1_rho) 
+#' result = choose_cells(D, X, numbers, n_steps, nu, kappa, resolution, betas, s2rf, s2e, groups, exclusive, family = family, t = t, ar1_rho = ar1_rho) 
 #' 
 #' # Example with no covariates, high spatial correlation, and Gaussian link.
 #' # Points should be far from each other.
@@ -138,7 +140,7 @@
 #' unfrozen_grp = "b"
 #' result = choose_cells(D, X, numbers, n_steps, nu, kappa, resolution, betas, s2rf, groups, exclusive, family = family, t = t, ar1_rho = ar1_rho, unfrozen_grp = unfrozen_grp) 
 #' @export
-choose_cells = function(D, X, numbers, n_steps, nu, kappa, resolution, betas, s2rf,
+choose_cells = function(D, X, numbers, n_steps, nu, kappa, resolution, betas, s2rf, s2e,
                         groups = NULL, exclusive = FALSE, s_initial = NULL, 
                         family = c("gaussian", "binomial"), Ds_parameters = NULL,
                         ar1_rho = NULL, t = NULL, report_every = 1, max_dist = Inf,
@@ -217,7 +219,8 @@ choose_cells = function(D, X, numbers, n_steps, nu, kappa, resolution, betas, s2
                               nu, kappa, resolution, betas, n_steps, family_int, 
                               Ds_parameters - 1, # To 0-indexed.
                               ar1_rho, t, s2rf, report_every, max_dist, report_candidates,
-                              temperature_alpha, use_frozen_grps, unfrozen_grp_int
+                              temperature_alpha, use_frozen_grps, unfrozen_grp_int,
+                              s2e
     )
     print("Finished choosing cell.")
     # Values from choose_cells_cpp are 0-indexed. Change them to be 1-indexed.
