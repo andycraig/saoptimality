@@ -138,10 +138,10 @@ row_col_update_of_matrix_and_inverse <- function(A, A_inv, want, j) {
 #' with side length double \code{max_dist}, will be considered.
 #' @param report_candidates If true, will print the candidates considered at each step, and their selection weights. Slow.
 #' @param temperature_alpha Temperature at step k is temperature_alpha ^ k.
-#' @param use_frozen_grps If true, only one group (specified by \code{unfrozen_grp}) is ever selected to change.
-#' @param unfrozen_grp The one group that is allowed to change, if \code{use_frozen_grps} is true.
+#' @param use_frozen_grps If true, only groups (specified by \code{unfrozen_grps}) are ever selected to change.
+#' @param unfrozen_grps The groups that are allowed to change, if \code{use_frozen_grps} is true.
 #' @param s2e The variance of the uncorrelated noise.
-choose_cells_cpp <- function(X, D, exclusive, grps, s, nu, kappa, resolution, betas, n_steps, family, Ds_parameters, ar1_rho, t, s2rf, report_every, max_dist, report_candidates, temperature_alpha, use_frozen_grps, unfrozen_grp, s2e) {
-    .Call(`_saoptimality_choose_cells_cpp`, X, D, exclusive, grps, s, nu, kappa, resolution, betas, n_steps, family, Ds_parameters, ar1_rho, t, s2rf, report_every, max_dist, report_candidates, temperature_alpha, use_frozen_grps, unfrozen_grp, s2e)
+choose_cells_cpp <- function(X, D, exclusive, grps, s, nu, kappa, resolution, betas, n_steps, family, Ds_parameters, ar1_rho, t, s2rf, report_every, max_dist, report_candidates, temperature_alpha, use_frozen_grps, unfrozen_grps, s2e) {
+    .Call(`_saoptimality_choose_cells_cpp`, X, D, exclusive, grps, s, nu, kappa, resolution, betas, n_steps, family, Ds_parameters, ar1_rho, t, s2rf, report_every, max_dist, report_candidates, temperature_alpha, use_frozen_grps, unfrozen_grps, s2e)
 }
 

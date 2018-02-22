@@ -41,8 +41,8 @@
 #' with side length double \code{max_dist}, will be considered.
 #' @param report_candidates Logical. If true, will print the candidates considered at each step, and their selection weights. Slow.
 #' @param temperature_alpha Numeric. Temperature at step k is \code{temperature_alpha} ^ k.
-#' @param unfrozen_grp One of the groups, as defined in \code{group}. If specified, elements of only that group are ever 
-#' selected to change.
+#' @param unfrozen_grps Character vector. One or more of the groups, as defined in \code{group}. If 
+#' specified, elements of only these groups are ever selected to change.
 #' @value List. Includes "s", an integer vector (1-indexed) being the indexes of the \code{D}, \code{X}, \code{groups} 
 #' that optimise the optimality criteria. Includes "summary", a data frame that includes columns 
 #' "proposed_index_to_switch", which gives the (1-indexed) index of the state vector that were proposed to be changed 
@@ -137,24 +137,21 @@
 #' groups = c(rep("a", round(nrow(D) / 2)), rep("b", nrow(D) - round(nrow(D) / 2)))
 #' ar1_rho = 0
 #' n_steps = 1000
-#' unfrozen_grp = "b"
-#' result = choose_cells(D, X, numbers, n_steps, nu, kappa, resolution, betas, s2rf, groups, exclusive, family = family, t = t, ar1_rho = ar1_rho, unfrozen_grp = unfrozen_grp) 
+#' unfrozen_grps = "b"
+#' result = choose_cells(D, X, numbers, n_steps, nu, kappa, resolution, betas, s2rf, groups, exclusive, family = family, t = t, ar1_rho = ar1_rho, unfrozen_grp = unfrozen_grps) 
 #' @export
 choose_cells = function(D, X, numbers, n_steps, nu, kappa, resolution, betas, s2rf, s2e,
                         groups = NULL, exclusive = FALSE, s_initial = NULL, 
                         family = c("gaussian", "binomial"), Ds_parameters = NULL,
                         ar1_rho = NULL, t = NULL, report_every = 1, max_dist = Inf,
                         report_candidates = FALSE, temperature_alpha = 0.99,
-                        unfrozen_grp = NULL) {
+                        unfrozen_grps = NULL) {
     
     library(magrittr)
     library(INLA) # This is REQUIRED in order for the inla.matern.cov function to work.
     #TODO Fix library(INLA) being required.
     # Check inputs.
     family <- match.arg(family)
-    if (length(unfrozen_grp) > 1) {
-        stop("Only one unfrozen_grp is permitted.")   
-    }
     if ((nrow(D) * t) != nrow(X)) {f
         stop(paste0("t (", t, ") times number of rows of D (", nrow(D), ") must be same as number of rows of X (", nrow(X), ").")) 
     }
@@ -168,8 +165,8 @@ choose_cells = function(D, X, numbers, n_steps, nu, kappa, resolution, betas, s2
     # Setup.
     family_int = which(family == c("gaussian", "binomial")) - 1 # -1 for 0-indexing.
     if (is.null(groups)) {
-        if (!is.null(unfrozen_grp)) {
-            stop("unfrozen_grp was specified but groups was not.")   
+        if (!is.null(unfrozen_grps)) {
+            stop("unfrozen_grps was specified but groups was not.")   
         }
         groups = rep(0, nrow(X)) 
         group_names = 0
@@ -184,12 +181,12 @@ choose_cells = function(D, X, numbers, n_steps, nu, kappa, resolution, betas, s2
         groups_int = groups_lookup[groups] %>% `names<-`(NULL)
     }
     
-    if (!is.null(unfrozen_grp)) {
+    if (!is.null(unfrozen_grps)) {
         use_frozen_grps = TRUE 
-        unfrozen_grp_int = groups_lookup[unfrozen_grp]
+        unfrozen_grps_int = groups_lookup[unfrozen_grps]
     } else {
         use_frozen_grps = FALSE  
-        unfrozen_grp_int = 999;
+        unfrozen_grps_int = 999;
     }
     
     if (is.null(s_initial)) {
@@ -219,7 +216,7 @@ choose_cells = function(D, X, numbers, n_steps, nu, kappa, resolution, betas, s2
                               nu, kappa, resolution, betas, n_steps, family_int, 
                               Ds_parameters - 1, # To 0-indexed.
                               ar1_rho, t, s2rf, report_every, max_dist, report_candidates,
-                              temperature_alpha, use_frozen_grps, unfrozen_grp_int,
+                              temperature_alpha, use_frozen_grps, unfrozen_grps_int,
                               s2e
     )
     print("Finished choosing cell.")

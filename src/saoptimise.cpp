@@ -138,27 +138,29 @@ NumericVector get_annealed_prob(NumericVector w, double temperature) {
 // inverse of a covariance matrix. This is cached to improve evaluation speed.
 class State {
 private:
-    const int family; // Gaussian, logistic etc.
-    const double resolution; // The minimum resolution of the locations.
-    const double nu; // Matern covariance parameter.
-    const double kappa; // Matern covariance parameter.
-    const arma::vec betas;
-    //TODO Make X, D const without throwing errors when .rows() is called on them.
-    arma::mat X; // N x p matrix of the covariates of ALL the available candidates.
-    arma::mat D; // N x 2 matrix of the x, y locations of ALL the available candidates.
+    // From here, declared in order of initialisation (so shouldn't be re-ordered).
     const arma::uvec grps; // Same length as candidates. Each element gives the group of the corresponding element of s.
     const std::vector<arma::mat> weights;
     const arma::uvec indices_within_weights; // For finding correct values in weights.
     const bool exclusive;
+    const double nu; // Matern covariance parameter.
+    const double kappa; // Matern covariance parameter.
+    const double resolution; // The minimum resolution of the locations.
+    const arma::vec betas;
+    const int family; // Gaussian, logistic etc.
     const double ar1_rho;
     const int t; // Number of time points.
+    const double s2rf; // Variance of random field.
+    bool use_weight_matrices; // If true, use pre-computed weight matrices for switching probabilities.
     const double max_dist; 
     const bool report_candidates;
     const bool use_frozen_grps;
-    const unsigned int unfrozen_grp; 
-    bool use_weight_matrices; // If true, use pre-computed weight matrices for switching probabilities.
-    const double s2rf; // Variance of random field.
+    const IntegerVector unfrozen_grps; 
     const double s2e; // Variance of uncorrelated noise.
+    // From here, order of declaration doesn't matter.
+    //TODO Make X, D const without throwing errors when .rows() is called on them.
+    arma::mat X; // N x p matrix of the covariates of ALL the available candidates.
+    arma::mat D; // N x 2 matrix of the x, y locations of ALL the available candidates.
     arma::uvec Ds_non_parameters; // Mask for betas not of interest, for D_s optimality.
     bool is_Ds; // true to calculate Ds optimality, false for D optimality.
     arma::mat C_temporal, C_temporal_inv, C_spatial, C_spatial_inv, W; // For caching parts of optimality calculation.
@@ -257,12 +259,12 @@ public:
           double nu_, double kappa_, double resolution_, arma::vec betas_, int family_, 
           arma::uvec Ds_parameters, double ar1_rho_, int t_, double s2rf_,
           bool use_weight_matrices_, double max_dist_, bool report_candidates_,
-          bool use_frozen_grps_, unsigned int unfrozen_grp_, double s2e_) : 
+          bool use_frozen_grps_, unsigned int unfrozen_grps_, double s2e_) : 
     grps(grps_), weights(weights_), indices_within_weights(indices_within_weights_),
     exclusive(exclusive_), nu(nu_), kappa(kappa_), resolution(resolution_), 
     betas(betas_), family(family_), ar1_rho(ar1_rho_), t(t_), s2rf(s2rf_),
     use_weight_matrices(use_weight_matrices_), max_dist(max_dist_), report_candidates(report_candidates_),
-    use_frozen_grps(use_frozen_grps_), unfrozen_grp(unfrozen_grp_), s2e(s2e_) {
+    use_frozen_grps(use_frozen_grps_), unfrozen_grps(unfrozen_grps_), s2e(s2e_) {
         
         X = X_;
         D = D_;
@@ -350,7 +352,22 @@ public:
     void propose(double temperature) {
         can_reject = true;
         if (use_frozen_grps) {
-            arma::uvec unfrozen_indexes_in_s = find(grps.elem(s) == unfrozen_grp); // Indexes of s in unfrozen_grp.
+            // Get indices in s of elements that are of one of the unfrozen groups.
+            // Should be possible with in(), but could not stop unsigned/signed int comparison warnings so 
+            // using (probably inefficient) for loop approach.
+            arma::uvec mask_in_unfrozen_grps(s.size(), arma::fill::zeros); // Initialise to false.
+            for (unsigned int i_s = 0; i_s < s.size(); ++i_s) { // unsigned int i_s because comparing to .size().
+                int i_s_grp = grps(s(i_s));
+                for (int i_grp = 0; i_grp < unfrozen_grps.size(); ++i_grp) { // unsigned int i_grp produces error here (!?).
+                    if (i_s_grp == unfrozen_grps(i_grp)) {
+                        mask_in_unfrozen_grps(i_s) = 1;
+                    }
+                }
+            }
+            // arma::uvec grps_elem_s = grps.elem(s);
+            // IntegerVector grps_elem_s_IntegerVector = IntegerVector(grps_elem_s.begin(), grps_elem_s.end());
+            // LogicalVector mask_in_unfrozen_grps = in(grps_elem_s_IntegerVector, unfrozen_grps);
+            arma::uvec unfrozen_indexes_in_s = arma::find(mask_in_unfrozen_grps); // Indexes of s in unfrozen_grps.
             IntegerVector unfrozen_indexes_in_s_IntVec = IntegerVector(unfrozen_indexes_in_s.begin(), unfrozen_indexes_in_s.end()); // Copy of eligible_2, for sampling.
             index_in_s_to_switch = sample(unfrozen_indexes_in_s_IntVec, 1)[0];
         } else {
@@ -553,8 +570,8 @@ step_summary get_next_state(State& s, double temperature, bool report) {
 //' with side length double \code{max_dist}, will be considered.
 //' @param report_candidates If true, will print the candidates considered at each step, and their selection weights. Slow.
 //' @param temperature_alpha Temperature at step k is temperature_alpha ^ k.
-//' @param use_frozen_grps If true, only one group (specified by \code{unfrozen_grp}) is ever selected to change.
-//' @param unfrozen_grp The one group that is allowed to change, if \code{use_frozen_grps} is true.
+//' @param use_frozen_grps If true, only groups (specified by \code{unfrozen_grps}) are ever selected to change.
+//' @param unfrozen_grps The groups that are allowed to change, if \code{use_frozen_grps} is true.
 //' @param s2e The variance of the uncorrelated noise.
 // [[Rcpp::export]]
 List choose_cells_cpp(arma::mat X, arma::mat D, bool exclusive, arma::uvec grps,
@@ -562,7 +579,7 @@ List choose_cells_cpp(arma::mat X, arma::mat D, bool exclusive, arma::uvec grps,
                       arma::vec betas, int n_steps, int family, arma::uvec Ds_parameters,
                       double ar1_rho, int t, double s2rf, unsigned int report_every,
                       double max_dist, bool report_candidates, double temperature_alpha,
-                      bool use_frozen_grps, unsigned int unfrozen_grp, double s2e) {
+                      bool use_frozen_grps, unsigned int unfrozen_grps, double s2e) {
     
     Rcout << "In C++..." << std::endl;
     if (exclusive) {
@@ -603,7 +620,7 @@ List choose_cells_cpp(arma::mat X, arma::mat D, bool exclusive, arma::uvec grps,
     State state = State(X, D, exclusive, grps, s, weights, indices_within_weights, 
                         nu, kappa, resolution, betas, family, Ds_parameters, ar1_rho, 
                         t, s2rf, use_weight_matrices, max_dist, report_candidates,
-                        use_frozen_grps, unfrozen_grp, s2e);
+                        use_frozen_grps, unfrozen_grps, s2e);
     // Initialise best to current.
     IntegerVector s_best = state.get_s_clone();
     double e_initial = state.evaluate();
