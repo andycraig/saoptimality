@@ -151,7 +151,7 @@ private:
     const double ar1_rho;
     const int t; // Number of time points.
     const double s2rf; // Variance of random field.
-    bool use_weight_matrices; // If true, use pre-computed weight matrices for switching probabilities.
+    const LogicalVector use_weight_matrices; // If true, use pre-computed weight matrices for switching probabilities.
     const double max_dist; 
     const bool report_candidates;
     const bool use_frozen_grps;
@@ -258,7 +258,7 @@ public:
           std::vector<arma::mat> weights_, arma::uvec indices_within_weights_, 
           double nu_, double kappa_, double resolution_, arma::vec betas_, int family_, 
           arma::uvec Ds_parameters, double ar1_rho_, int t_, double s2rf_,
-          bool use_weight_matrices_, double max_dist_, bool report_candidates_,
+          LogicalVector use_weight_matrices_, double max_dist_, bool report_candidates_,
           bool use_frozen_grps_, unsigned int unfrozen_grps_, double s2e_) : 
     grps(grps_), weights(weights_), indices_within_weights(indices_within_weights_),
     exclusive(exclusive_), nu(nu_), kappa(kappa_), resolution(resolution_), 
@@ -379,7 +379,7 @@ public:
         // Weight probabilities of indexes to select by 'distance' from s_to_switch.
         unsigned int grp_of_old_element = grps[old_element];
         unsigned int new_candidate;
-        if (use_weight_matrices) {
+        if (use_weight_matrices(grp_of_old_element)) {
             arma::rowvec weights_available = weights[grp_of_old_element].row(indices_within_weights[old_element]);
             if (exclusive) {
                 // Zero probability of all candidates in current state.
@@ -591,31 +591,27 @@ List choose_cells_cpp(arma::mat X, arma::mat D, bool exclusive, arma::uvec grps,
     arma::uvec grp_names = unique(grps);
     int n_grps = grp_names.size();
     
-    Rcout << "Checking group sizes..." << std::endl;
-    unsigned int max_grp_size = 0;
-    for (int i_grp = 0; i_grp < n_grps; ++i_grp) {
-        arma::uvec indices_for_this_grp = arma::find(grps == i_grp);
-        max_grp_size = std::max(max_grp_size, indices_for_this_grp.size());   
-    }
-    Rcout << "Largest group size: " << max_grp_size << std::endl;
-    bool use_weight_matrices;
+    // If group is small enough, precalculate weight matrix (for choosing new candidates).
+    // If group is too large, don't (and use dynamically calculated weights instead).
+    LogicalVector use_weight_matrices(n_grps);
     std::vector<arma::mat> weights(n_grps);
     arma::uvec indices_within_weights(grps.size(), arma::fill::zeros);
-    //TODO Change this back to if (max_grp_size <= 10000)
-    if (false) {
-        use_weight_matrices = true;
-        Rcout << "Calculating weight matrices for switching probabilities..." << std::endl;
-        // Create weights vector, each element of which is the distance matrix for a group.
-        // Create a uvec that can be used to look up an element's index within the weight matrix..
-        for (int i_grp = 0; i_grp < n_grps; ++i_grp) {
+    for (int i_grp = 0; i_grp < n_grps; ++i_grp) {
+        arma::uvec indices_for_this_grp = arma::find(grps == i_grp);
+        if (indices_for_this_grp.size() < 500) {
+            use_weight_matrices[i_grp] = true;
+            Rcout << "Group " << i_grp << "/" << n_grps - 1 << ": Calculating weight matrices for switching probabilities..." << std::endl;
+            // Create weights vector, each element of which is the distance matrix for a group.
+            // Create a uvec that can be used to look up an element's index within the weight matrix..
             arma::uvec indices_for_this_grp = arma::find(grps == i_grp);
             weights[i_grp] = 1 / get_dist_matrix(D.rows(indices_for_this_grp));
             indices_within_weights.elem(indices_for_this_grp) = arma::linspace<arma::uvec>(0, indices_for_this_grp.size() - 1, indices_for_this_grp.size());
+        } else {
+            use_weight_matrices[i_grp] = false;
+            Rcout << "Group " << i_grp << "/" << n_grps - 1 << ": Group too large. Will calculate weights dynamically." << std::endl;
+            // Leave weights[i_grp] uninitialised.
+            // Don't set indices_within_weights for this group.
         }
-    } else {
-        use_weight_matrices = false;
-        Rcout << "At least one group is too large to use weight matrices for switching." << std::endl;
-        Rcout << "Will calculate switching weights dynamically." << std::endl;
     }
     State state = State(X, D, exclusive, grps, s, weights, indices_within_weights, 
                         nu, kappa, resolution, betas, family, Ds_parameters, ar1_rho, 
