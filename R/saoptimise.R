@@ -67,7 +67,7 @@
 #' library(ggplot2)
 #' D %>% ggplot(aes(x = x , y = y, color = groups)) + geom_point()
 #' # Optimise.
-#' result = choose_cells(D, X, numbers, n_steps, nu, kappa, resolution, betas, s2rf, groups, exclusive, family = family, t = t, ar1_rho = ar1_rho) 
+#' result = choose_cells(D, X, numbers, n_steps, nu, kappa, resolution, betas, s2rf, s2e, groups, exclusive, family = family, t = t, ar1_rho = ar1_rho) 
 #' # Display initial.
 #' D[result$s_initial,] %>% ggplot(aes(x = x, y = y, colour = groups[result$s_initial])) + geom_point(size = 10) + xlim(min(D$x), max(D$x)) + ylim(min(D$y), max(D$y))
 #' # Display results. 
@@ -121,24 +121,25 @@
 #' groups = rep("a", nrow(D))
 #' ar1_rho = 0
 #' 
-#' #' # Example with frozen group. Only group b should change.
+#' #' # Example with frozen group. Only groups b and d should change.
 #' t = 1
-#' numbers = list(a = 3, b = 4)
+#' numbers = list(a = 3, b = 4, d = 2)
 #' nu = 1
 #' range = 0.01 # Distance where covariance becomes about 0.1
 #' kappa =  sqrt(8 * nu) / range # INLA definition.
-#' D = expand.grid(x = seq(-1, 1, by = 0.2), y = seq(-1, 1, by = 0.2))
+#' D = expand.grid(x = seq(-1, 1, by = 0.2), y = seq(-1, 1, by = 0.2))[1:120,]
 #' X = cbind(rep(1, nrow(D)), D$x) # Intercept and x coordinate as covariate.
 #' betas = c(1, 1)
 #' s2rf = 1
+#' s2e = 1
 #' resolution = 0.1
 #' exclusive = FALSE
 #' family = "gaussian"
-#' groups = c(rep("a", round(nrow(D) / 2)), rep("b", nrow(D) - round(nrow(D) / 2)))
+#' groups = c(rep("a", round(nrow(D) / 2)), rep("b", nrow(D) / 4), rep("d", nrow(D) / 4))
 #' ar1_rho = 0
 #' n_steps = 1000
-#' unfrozen_grps = "b"
-#' result = choose_cells(D, X, numbers, n_steps, nu, kappa, resolution, betas, s2rf, groups, exclusive, family = family, t = t, ar1_rho = ar1_rho, unfrozen_grp = unfrozen_grps) 
+#' unfrozen_grps = c("b", "d")
+#' result = choose_cells(D, X, numbers, n_steps, nu, kappa, resolution, betas, s2rf, s2e, groups, exclusive, family = family, t = t, ar1_rho = ar1_rho, unfrozen_grp = unfrozen_grps) 
 #' @export
 choose_cells = function(D, X, numbers, n_steps, nu, kappa, resolution, betas, s2rf, s2e,
                         groups = NULL, exclusive = FALSE, s_initial = NULL, 

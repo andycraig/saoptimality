@@ -259,7 +259,7 @@ public:
           double nu_, double kappa_, double resolution_, arma::vec betas_, int family_, 
           arma::uvec Ds_parameters, double ar1_rho_, int t_, double s2rf_,
           LogicalVector use_weight_matrices_, double max_dist_, bool report_candidates_,
-          bool use_frozen_grps_, unsigned int unfrozen_grps_, double s2e_) : 
+          bool use_frozen_grps_, IntegerVector unfrozen_grps_, double s2e_) : 
     grps(grps_), weights(weights_), indices_within_weights(indices_within_weights_),
     exclusive(exclusive_), nu(nu_), kappa(kappa_), resolution(resolution_), 
     betas(betas_), family(family_), ar1_rho(ar1_rho_), t(t_), s2rf(s2rf_),
@@ -579,7 +579,7 @@ List choose_cells_cpp(arma::mat X, arma::mat D, bool exclusive, arma::uvec grps,
                       arma::vec betas, int n_steps, int family, arma::uvec Ds_parameters,
                       double ar1_rho, int t, double s2rf, unsigned int report_every,
                       double max_dist, bool report_candidates, double temperature_alpha,
-                      bool use_frozen_grps, unsigned int unfrozen_grps, double s2e) {
+                      bool use_frozen_grps, IntegerVector unfrozen_grps, double s2e) {
     
     Rcout << "In C++..." << std::endl;
     if (exclusive) {
