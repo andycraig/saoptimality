@@ -43,6 +43,9 @@
 #' @param temperature_alpha Numeric. Temperature at step k is \code{temperature_alpha} ^ k.
 #' @param unfrozen_grps Character vector. One or more of the groups, as defined in \code{group}. If 
 #' specified, elements of only these groups are ever selected to change.
+#' @param max_grp_size_for_weight_matrix Integer. Any group with a total number of units up to (and including) 
+#' this number will have new elements chosen using a weight matrix that includes all units of that 
+#' group. Otherwise, the weight matrix will be calculated dynamically using \code{max_dist}.
 #' @value List. Includes "s", an integer vector (1-indexed) being the indexes of the \code{D}, \code{X}, \code{groups} 
 #' that optimise the optimality criteria. Includes "summary", a data frame that includes columns 
 #' "proposed_index_to_switch", which gives the (1-indexed) index of the state vector that were proposed to be changed 
@@ -146,7 +149,7 @@ choose_cells = function(D, X, numbers, n_steps, nu, kappa, resolution, betas, s2
                         family = c("gaussian", "binomial"), Ds_parameters = NULL,
                         ar1_rho = NULL, t = NULL, report_every = 1, max_dist = Inf,
                         report_candidates = FALSE, temperature_alpha = 0.99,
-                        unfrozen_grps = NULL) {
+                        unfrozen_grps = NULL, max_grp_size_for_weight_matrix = Inf) {
     
     library(magrittr)
     library(INLA) # This is REQUIRED in order for the inla.matern.cov function to work.
@@ -218,7 +221,7 @@ choose_cells = function(D, X, numbers, n_steps, nu, kappa, resolution, betas, s2
                               Ds_parameters - 1, # To 0-indexed.
                               ar1_rho, t, s2rf, report_every, max_dist, report_candidates,
                               temperature_alpha, use_frozen_grps, unfrozen_grps_int,
-                              s2e
+                              s2e, max_grp_size_for_weight_matrix
     )
     print("Finished choosing cell.")
     # Values from choose_cells_cpp are 0-indexed. Change them to be 1-indexed.

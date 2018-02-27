@@ -573,13 +573,17 @@ step_summary get_next_state(State& s, double temperature, bool report) {
 //' @param use_frozen_grps If true, only groups (specified by \code{unfrozen_grps}) are ever selected to change.
 //' @param unfrozen_grps The groups that are allowed to change, if \code{use_frozen_grps} is true.
 //' @param s2e The variance of the uncorrelated noise.
+//' @param max_grp_size_for_weight_matrix Any group with a total number of units up to (and including) 
+//' this number will have new elements chosen using a weight matrix that includes all units of that 
+//' group. Otherwise, the weight matrix will be calculated dynamically using \code{max_dist}.
 // [[Rcpp::export]]
 List choose_cells_cpp(arma::mat X, arma::mat D, bool exclusive, arma::uvec grps,
                       arma::uvec s, double nu, double kappa, double resolution, 
                       arma::vec betas, int n_steps, int family, arma::uvec Ds_parameters,
                       double ar1_rho, int t, double s2rf, unsigned int report_every,
                       double max_dist, bool report_candidates, double temperature_alpha,
-                      bool use_frozen_grps, IntegerVector unfrozen_grps, double s2e) {
+                      bool use_frozen_grps, IntegerVector unfrozen_grps, 
+                      double s2e, unsigned int max_grp_size_for_weight_matrix) {
     
     Rcout << "In C++..." << std::endl;
     if (exclusive) {
@@ -598,7 +602,7 @@ List choose_cells_cpp(arma::mat X, arma::mat D, bool exclusive, arma::uvec grps,
     arma::uvec indices_within_weights(grps.size(), arma::fill::zeros);
     for (int i_grp = 0; i_grp < n_grps; ++i_grp) {
         arma::uvec indices_for_this_grp = arma::find(grps == i_grp);
-        if (indices_for_this_grp.size() < 500) {
+        if (indices_for_this_grp.size() <= max_grp_size_for_weight_matrix) {
             use_weight_matrices[i_grp] = true;
             Rcout << "Group " << i_grp << "/" << n_grps - 1 << ": Calculating weight matrices for switching probabilities..." << std::endl;
             // Create weights vector, each element of which is the distance matrix for a group.
