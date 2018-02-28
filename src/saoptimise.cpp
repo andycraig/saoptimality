@@ -219,7 +219,6 @@ private:
         calculate_d_optimality();
     }
     // Calculate D-optimality in separate function so it can be called 
-    // on initialisation and on update.
     void calculate_d_optimality() {
         // Re-compute optimality criterion.
         // We seek to MINIMISE this criterion e. Small means a larger information matrix determinant.
@@ -374,22 +373,22 @@ public:
             index_in_s_to_switch = sample(indexes_in_s, 1)[0]; // The index of the item in s to switch. indexes_in_s is just 0:(length(s) - 1).
         }
         // Record the element we'll replace.
-        old_element = s[index_in_s_to_switch]; // The value of the item in s to switch.
+        old_element = s(index_in_s_to_switch); // The value of the item in s to switch.
         // Want to replace with an element from the same group, so check that. 
         // Weight probabilities of indexes to select by 'distance' from s_to_switch.
-        unsigned int grp_of_old_element = grps[old_element];
+        unsigned int grp_of_old_element = grps(old_element);
         unsigned int new_candidate;
         if (use_weight_matrices(grp_of_old_element)) {
-            arma::rowvec weights_available = weights[grp_of_old_element].row(indices_within_weights[old_element]);
+            arma::rowvec weights_available = weights[grp_of_old_element].row(indices_within_weights(old_element));
             if (exclusive) {
                 // Zero probability of all candidates in current state.
                 for (unsigned int i_s = 0; i_s < s.size(); ++i_s) {
-                    if (grps[s[i_s]] == grp_of_old_element) {
-                        weights_available[indices_within_weights[s[i_s]]] = 0; 
+                    if (grps(s(i_s)) == grp_of_old_element) {
+                        weights_available(indices_within_weights(s(i_s))) = 0; 
                     }
                 }
             } else {
-                weights_available[old_element] = 0; // Zero probability of selecting same candidate.
+                weights_available(indices_within_weights(old_element)) = 0; // Zero probability of selecting same candidate.
             }
             if (report_candidates) {
                 Rcout << "Candidate weights: " << std::endl << weights_available.t() << std::endl;
@@ -403,6 +402,7 @@ public:
                                                                    weights_available.end()),
                                                                    temperature))[0];
         } else {
+            Rcout << "Dynamically calculating weight matrix. " << std::endl;
             // Can't use precomputed weight matrix, so select from nearby elements of same group.
             //TODO There is surely a way of doing this with some version of &.
             arma::uvec find_grp = find((grps == grp_of_old_element)); 

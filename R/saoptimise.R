@@ -124,7 +124,7 @@
 #' groups = rep("a", nrow(D))
 #' ar1_rho = 0
 #' 
-#' #' # Example with frozen group. Only groups b and d should change.
+#' #' # Example with frozen groups. Only groups b and d should change.
 #' t = 1
 #' numbers = list(a = 3, b = 4, d = 2)
 #' nu = 1
@@ -142,7 +142,8 @@
 #' ar1_rho = 0
 #' n_steps = 1000
 #' unfrozen_grps = c("b", "d")
-#' result = choose_cells(D, X, numbers, n_steps, nu, kappa, resolution, betas, s2rf, s2e, groups, exclusive, family = family, t = t, ar1_rho = ar1_rho, unfrozen_grp = unfrozen_grps) 
+#' max_grp_size_for_weight_matrix = 40 # Group a will use dynamic weights.
+#' result = choose_cells(D, X, numbers, n_steps, nu, kappa, resolution, betas, s2rf, s2e, groups, exclusive, family = family, t = t, ar1_rho = ar1_rho, unfrozen_grp = unfrozen_grps, max_grp_size_for_weight_matrix = max_grp_size_for_weight_matrix) 
 #' @export
 choose_cells = function(D, X, numbers, n_steps, nu, kappa, resolution, betas, s2rf, s2e,
                         groups = NULL, exclusive = FALSE, s_initial = NULL, 
